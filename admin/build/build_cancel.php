@@ -17,7 +17,7 @@
 
 /**
  * \file        admin/build/build_cancel.php
- * \ingroup     cyphtWebmail
+ * \ingroup     cyphtwebmail
  * \brief       AJAX endpoint for the Cancel button. Runs as a separate
  *              request from the one running the build, so it just drops a
  *              flag file that the build's own polling loop checks.
