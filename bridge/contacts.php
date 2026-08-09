@@ -45,7 +45,7 @@ if (!defined('NOBROWSERNOTIF')) {
 	define('NOBROWSERNOTIF', '1');
 }
 
-// Load Dolibarr environment (module lives at htdocs/custom/cyphtWebmail/bridge).
+// Load Dolibarr environment (module lives at htdocs/custom/cyphtwebmail/bridge).
 $res = 0;
 if (!$res && !empty($_SERVER["CONTEXT_DOCUMENT_ROOT"])) {
 	$res = @include $_SERVER["CONTEXT_DOCUMENT_ROOT"]."/main.inc.php";
