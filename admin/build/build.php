@@ -17,7 +17,7 @@
 
 /**
  * \file        admin/build/build.php
- * \ingroup     cyphtWebmail
+ * \ingroup     cyphtwebmail
  * \brief       Build page: runs Cypht's config_gen.php through CyphtWebmail.
  */
 
@@ -47,7 +47,7 @@ require_once __DIR__.'/../../class/webmail.class.php';
 
 global $conf, $db, $langs, $user;
 
-$langs->loadLangs(array("admin", "cyphtWebmail@cyphtWebmail"));
+$langs->loadLangs(array("admin", "cyphtwebmail@cyphtwebmail"));
 
 if (!$user->admin) {
 	http_response_code(403);
