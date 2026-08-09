@@ -19,7 +19,7 @@ require_once __DIR__ . '/../install/paths.class.php';
 
 /**
  * \file        class/install/vendorlayout.class.php
- * \ingroup     cyphtWebmail
+ * \ingroup     cyphtwebmail
  * \brief       Bridges Cypht's flat-Composer-dependency layout (installed
  *              as a direct dependency of this module, same as Tiki does)
  *              against Cypht's own scripts, which expect a nested vendor/
