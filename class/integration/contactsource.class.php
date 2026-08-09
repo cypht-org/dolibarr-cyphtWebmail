@@ -19,7 +19,7 @@ require_once __DIR__ . '/../install/paths.class.php';
 
 /**
  * \file        class/integration/contactsource.class.php
- * \ingroup     cyphtWebmail
+ * \ingroup     cyphtwebmail
  * \brief       Installs the "dolibarr_contacts" Cypht module set, which
  *              exposes Dolibarr third parties and contacts to Cypht as a
  *              read-only contact source.
@@ -86,7 +86,7 @@ class CyphtContactSource
 			return $url;
 		}
 
-		return dol_buildpath('/cyphtWebmail/bridge/contacts.php', 2);
+		return dol_buildpath('/cyphtwebmail/bridge/contacts.php', 2);
 	}
 
 }
