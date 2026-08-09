@@ -19,7 +19,7 @@ require_once __DIR__ . '/../install/paths.class.php';
 
 /**
  * \file        class/install/upstreampatches.class.php
- * \ingroup     cyphtWebmail
+ * \ingroup     cyphtwebmail
  * \brief       Patches an upstream Cypht bug that surfaces once a module's
  *              functions.php gets require()'d twice in the same process,
  *              which performSsoLogin()'s "functional login" call does.
