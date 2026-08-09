@@ -24,7 +24,7 @@ require_once __DIR__ . '/../install/moduleinstaller.class.php';
 
 /**
  * \file        class/install/pipeline.class.php
- * \ingroup     cyphtWebmail
+ * \ingroup     cyphtwebmail
  * \brief       Runs the "Generate" pipeline: composer install, Cypht's
  *              config_gen.php, then publish. Depends on CyphtEnvironment,
  *              CyphtVendorLayout and CyphtUpstreamPatches;
