@@ -19,7 +19,7 @@ require_once __DIR__ . '/../install/paths.class.php';
 
 /**
  * \file        class/install/moduleinstaller.class.php
- * \ingroup     cyphtWebmail
+ * \ingroup     cyphtwebmail
  * \brief       Installs this module's Cypht module sets into the vendored
  *              Cypht application.
  *
