@@ -22,7 +22,7 @@
  * 	\defgroup   cypht-webmail     Module cyphtWebmail
  *  \brief      cyphtWebmail module descriptor.
  *
- *  \file       htdocs/cyphtWebmail/core/modules/modcyphtWebmail.class.php
+ *  \file       htdocs/cyphtwebmail/core/modules/modcyphtWebmail.class.php
  *  \ingroup    cyphtWebmail
  *  \brief      Description and activation file for module cyphtWebmail
  */
@@ -76,7 +76,7 @@ class modcyphtWebmail extends DolibarrModules
 		// Author
 		$this->editor_name = 'CamiluxTest';
 		$this->editor_url = '';		// Must be an external online web site
-		$this->editor_squarred_logo = '';					// Must be image filename into the module/img directory followed with @modulename. Example: 'myimage.png@cyphtWebmail'
+		$this->editor_squarred_logo = '';					// Must be image filename into the module/img directory followed with @modulename. Example: 'myimage.png@cyphtwebmail'
 
 		// Possible values for version are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated', 'experimental_deprecated' or a version string like 'x.y.z'
 		$this->version = '1.0';
@@ -101,7 +101,7 @@ class modcyphtWebmail extends DolibarrModules
 		// Define some features supported by module (triggers, login, substitutions, menus, css, etc...)
 		// If your module use the parameter "core_enabled" and you would like to activate the parts in all entities (Multicompany):
 		// 'xxxxxx' => array(
-		//		'data' => 1 or '/cyphtWebmail/xxx/cyphtWebmail.xxx.php',
+		//		'data' => 1 or '/cyphtwebmail/xxx/cyphtwebmail.xxx.php',
 		//		'entity' => '0'
 		//	),
 		// 'hooks' => array(
@@ -135,11 +135,11 @@ class modcyphtWebmail extends DolibarrModules
 			'theme' => 0,
 			// Set this to relative path of css file if module has its own css file
 			'css' => array(
-				//    '/cyphtWebmail/css/cyphtWebmail.css.php',
+				//    '/cyphtwebmail/css/cyphtwebmail.css.php',
 			),
 			// Set this to relative path of js file if module must load a js on all pages
 			'js' => array(
-				//   '/cyphtWebmail/js/cyphtWebmail.js.php',
+				//   '/cyphtwebmail/js/cyphtwebmail.js.php',
 			),
 			// Set here all hooks context managed by module. To find available hook context, make a "grep -r '>initHooks(' *" on source code. You can also set hook context to 'all'
 			/* BEGIN MODULEBUILDER HOOKSCONTEXTS */
@@ -157,8 +157,8 @@ class modcyphtWebmail extends DolibarrModules
 		);
 
 		// Data directories to create when module is enabled.
-		// Example: this->dirs = array("/cyphtWebmail/temp","/cyphtWebmail/subdir");
-		$this->dirs = array("/cyphtWebmail/temp");
+		// Example: this->dirs = array("/cyphtwebmail/temp","/cyphtwebmail/subdir");
+		$this->dirs = array("/cyphtwebmail/temp");
 
 		// Config pages. Put here list of php page, stored into cyphtWebmail/admin directory, to use to setup module.
 		$this->config_page_url = array("setup.php@cyphtwebmail");
@@ -214,9 +214,9 @@ class modcyphtWebmail extends DolibarrModules
 		/* END MODULEBUILDER TABS */
 		// Example:
 		// To add a new tab identified by code tabname1
-		// $this->tabs[] = array('data' => 'objecttype:+tabname1:Title1:mylangfile@cyphtWebmail:$user->hasRight('cyphtWebmail', 'myobject', 'read'):/cyphtWebmail/mynewtab1.php?id=__ID__');
+		// $this->tabs[] = array('data' => 'objecttype:+tabname1:Title1:mylangfile@cyphtwebmail:$user->hasRight('cyphtWebmail', 'myobject', 'read'):/cyphtwebmail/mynewtab1.php?id=__ID__');
 		// To add another new tab identified by code tabname2. Label will be result of calling all substitution functions on 'Title2' key.
-		// $this->tabs[] = array('data' => 'objecttype:+tabname2:SUBSTITUTION_Title2:mylangfile@cyphtWebmail:$user->hasRight('othermodule', 'otherobject', 'read'):/cyphtWebmail/mynewtab2.php?id=__ID__',
+		// $this->tabs[] = array('data' => 'objecttype:+tabname2:SUBSTITUTION_Title2:mylangfile@cyphtwebmail:$user->hasRight('othermodule', 'otherobject', 'read'):/cyphtwebmail/mynewtab2.php?id=__ID__',
 		// To remove an existing tab identified by code tabname
 		// $this->tabs[] = array('data' => 'objecttype:-tabname:NU:conditiontoremove');
 		//
@@ -246,7 +246,7 @@ class modcyphtWebmail extends DolibarrModules
 		// Dictionaries
 		/* Example:
 		 $this->dictionaries=array(
-		 'langs' => 'cyphtWebmail@cyphtWebmail',
+		 'langs' => 'cyphtwebmail@cyphtwebmail',
 		 // List of tables we want to see into dictionary editor
 		 'tabname' => array("table1", "table2", "table3"),
 		 // Label of tables
@@ -278,7 +278,7 @@ class modcyphtWebmail extends DolibarrModules
 		/* BEGIN MODULEBUILDER WIDGETS */
 		$this->boxes = array(
 			//  0 => array(
-			//      'file' => 'cyphtWebmailwidget1.php@cyphtWebmail',
+			//      'file' => 'cyphtWebmailwidget1.php@cyphtwebmail',
 			//      'note' => 'Widget provided by cyphtWebmail',
 			//      'enabledbydefaulton' => 'Home',
 			//  ),
@@ -293,7 +293,7 @@ class modcyphtWebmail extends DolibarrModules
 			//  0 => array(
 			//      'label' => 'MyJob label',
 			//      'jobtype' => 'method',
-			//      'class' => '/cyphtWebmail/class/myobject.class.php',
+			//      'class' => '/cyphtwebmail/class/myobject.class.php',
 			//      'objectname' => 'MyObject',
 			//      'method' => 'doScheduledJob',
 			//      'parameters' => '',
@@ -349,7 +349,7 @@ class modcyphtWebmail extends DolibarrModules
 			'prefix' => img_picto('', $this->picto, 'class="pictofixedwidth valignmiddle"'),
 			'mainmenu' => 'cyphtwebmail',
 			'leftmenu' => '',
-			'url' => '/cyphtWebmail/index.php',
+			'url' => '/cyphtwebmail/index.php',
 			'langs' => 'cyphtwebmail@cyphtwebmail', // Lang file to use (without .lang) by module. File must be in langs/code_CODE/ directory.
 			'position' => 1000 + $r,
 			'enabled' => "isModEnabled('cyphtwebmail')", // Define condition to show or hide menu entry. Use "isModEnabled('cyphtWebmail')" if entry must be visible if module is enabled (those quote marks are importants).
@@ -379,7 +379,7 @@ class modcyphtWebmail extends DolibarrModules
 			'prefix' => img_picto('', $this->picto, 'class="pictofixedwidth valignmiddle paddingright"'),
 			'mainmenu' => 'cyphtwebmail',
 			'leftmenu' => 'cyphtwebmail_index',
-			'url' => '/cyphtWebmail/index.php',
+			'url' => '/cyphtwebmail/index.php',
 			'langs' => 'cyphtwebmail@cyphtwebmail',
 			'position' => 1000 + $r,
 			'enabled' => "isModEnabled('cyphtwebmail')",
@@ -487,7 +487,7 @@ class modcyphtWebmail extends DolibarrModules
 			'titre' => 'CyphtMenuModuleSetup',
 			'mainmenu' => 'cyphtwebmail',
 			'leftmenu' => 'cyphtwebmail_setup',
-			'url' => '/cyphtWebmail/admin/setup.php',
+			'url' => '/cyphtwebmail/admin/setup.php',
 			'langs' => 'cyphtwebmail@cyphtwebmail',
 			'position' => 1000 + $r,
 			'enabled' => "isModEnabled('cyphtwebmail')",
@@ -506,8 +506,8 @@ class modcyphtWebmail extends DolibarrModules
 			'prefix' => img_picto('', $this->picto, 'class="pictofixedwidth valignmiddle paddingright"'),
 			'mainmenu' => 'cyphtWebmail',
 			'leftmenu' => 'myobject',
-			'url' => '/cyphtWebmail/index.php',
-			'langs' => 'cyphtWebmail@cyphtWebmail',	        // Lang file to use (without .lang) by module. File must be in langs/code_CODE/ directory.
+			'url' => '/cyphtwebmail/index.php',
+			'langs' => 'cyphtwebmail@cyphtwebmail',	        // Lang file to use (without .lang) by module. File must be in langs/code_CODE/ directory.
 			'position' => 1000 + $r,
 			'enabled' => "isModEnabled('cyphtWebmail')", // Define condition to show or hide menu entry. Use isModEnabled("cyphtWebmail") if entry must be visible if module is enabled.
 			'perms' => '$user->hasRight("cyphtWebmail", "myobject", "read")',
@@ -521,8 +521,8 @@ class modcyphtWebmail extends DolibarrModules
 			'titre' => 'New_MyObject',
 			'mainmenu' => 'cyphtWebmail',
 			'leftmenu' => 'cyphtWebmail_myobject_new',
-			'url' => '/cyphtWebmail/myobject_card.php?action=create',
-			'langs' => 'cyphtWebmail@cyphtWebmail',	        // Lang file to use (without .lang) by module. File must be in langs/code_CODE/ directory.
+			'url' => '/cyphtwebmail/myobject_card.php?action=create',
+			'langs' => 'cyphtwebmail@cyphtwebmail',	        // Lang file to use (without .lang) by module. File must be in langs/code_CODE/ directory.
 			'position' => 1000 + $r,
 			'enabled' => "isModEnabled('cyphtWebmail')", // Define condition to show or hide menu entry. Use isModEnabled("cyphtWebmail") if entry must be visible if module is enabled. Use '$leftmenu==\'system\'' to show if leftmenu system is selected.
 			'perms' => '$user->hasRight("cyphtWebmail", "myobject", "write")'
@@ -536,8 +536,8 @@ class modcyphtWebmail extends DolibarrModules
 			'titre' => 'List_MyObject',
 			'mainmenu' => 'cyphtWebmail',
 			'leftmenu' => 'cyphtWebmail_myobject_list',
-			'url' => '/cyphtWebmail/myobject_list.php',
-			'langs' => 'cyphtWebmail@cyphtWebmail',	        // Lang file to use (without .lang) by module. File must be in langs/code_CODE/ directory.
+			'url' => '/cyphtwebmail/myobject_list.php',
+			'langs' => 'cyphtwebmail@cyphtwebmail',	        // Lang file to use (without .lang) by module. File must be in langs/code_CODE/ directory.
 			'position' => 1000 + $r,
 			'enabled' => "isModEnabled('cyphtWebmail')", // Define condition to show or hide menu entry. Use isModEnabled("cyphtWebmail") if entry must be visible if module is enabled.
 			'perms' => '$user->hasRight("cyphtWebmail", "myobject", "read")'
@@ -553,20 +553,20 @@ class modcyphtWebmail extends DolibarrModules
 		$r = 0;
 		/* BEGIN MODULEBUILDER EXPORT MYOBJECT */
 		/*
-		$langs->load("cyphtWebmail@cyphtWebmail");
+		$langs->load("cyphtwebmail@cyphtwebmail");
 		$this->export_code[$r] = $this->rights_class.'_'.$r;
 		$this->export_label[$r] = 'MyObjectLines';	// Translation key (used only if key ExportDataset_xxx_z not found)
 		$this->export_icon[$r] = $this->picto;
 		// Define $this->export_fields_array, $this->export_TypeFields_array and $this->export_entities_array
-		$keyforclass = 'MyObject'; $keyforclassfile='/cyphtWebmail/class/myobject.class.php'; $keyforelement='myobject@cyphtWebmail';
+		$keyforclass = 'MyObject'; $keyforclassfile='/cyphtwebmail/class/myobject.class.php'; $keyforelement='myobject@cyphtwebmail';
 		include DOL_DOCUMENT_ROOT.'/core/commonfieldsinexport.inc.php';
 		//$this->export_fields_array[$r]['t.fieldtoadd']='FieldToAdd'; $this->export_TypeFields_array[$r]['t.fieldtoadd']='Text';
 		//unset($this->export_fields_array[$r]['t.fieldtoremove']);
-		//$keyforclass = 'MyObjectLine'; $keyforclassfile='/cyphtWebmail/class/myobject.class.php'; $keyforelement='myobjectline@cyphtWebmail'; $keyforalias='tl';
+		//$keyforclass = 'MyObjectLine'; $keyforclassfile='/cyphtwebmail/class/myobject.class.php'; $keyforelement='myobjectline@cyphtwebmail'; $keyforalias='tl';
 		//include DOL_DOCUMENT_ROOT.'/core/commonfieldsinexport.inc.php';
-		$keyforselect='myobject'; $keyforaliasextra='extra'; $keyforelement='myobject@cyphtWebmail';
+		$keyforselect='myobject'; $keyforaliasextra='extra'; $keyforelement='myobject@cyphtwebmail';
 		include DOL_DOCUMENT_ROOT.'/core/extrafieldsinexport.inc.php';
-		//$keyforselect='myobjectline'; $keyforaliasextra='extraline'; $keyforelement='myobjectline@cyphtWebmail';
+		//$keyforselect='myobjectline'; $keyforaliasextra='extraline'; $keyforelement='myobjectline@cyphtwebmail';
 		//include DOL_DOCUMENT_ROOT.'/core/extrafieldsinexport.inc.php';
 		//$this->export_dependencies_array[$r] = array('myobjectline' => array('tl.rowid','tl.ref')); // To force to activate one or several fields if we select some fields that need same (like to select a unique key if we ask a field of a child to avoid the DISTINCT to discard them, or for computed field than need several other fields)
 		//$this->export_special_array[$r] = array('t.field' => '...');
@@ -584,17 +584,17 @@ class modcyphtWebmail extends DolibarrModules
 		$r = 0;
 		/* BEGIN MODULEBUILDER IMPORT MYOBJECT */
 		/*
-		$langs->load("cyphtWebmail@cyphtWebmail");
+		$langs->load("cyphtwebmail@cyphtwebmail");
 		$this->import_code[$r] = $this->rights_class.'_'.$r;
 		$this->import_label[$r] = 'MyObjectLines';	// Translation key (used only if key ExportDataset_xxx_z not found)
 		$this->import_icon[$r] = $this->picto;
 		$this->import_tables_array[$r] = array('t' => $this->db->prefix().'cyphtWebmail_myobject', 'extra' => $this->db->prefix().'cyphtWebmail_myobject_extrafields');
 		$this->import_tables_creator_array[$r] = array('t' => 'fk_user_author'); // Fields to store import user id
 		$import_sample = array();
-		$keyforclass = 'MyObject'; $keyforclassfile='/cyphtWebmail/class/myobject.class.php'; $keyforelement='myobject@cyphtWebmail';
+		$keyforclass = 'MyObject'; $keyforclassfile='/cyphtwebmail/class/myobject.class.php'; $keyforelement='myobject@cyphtwebmail';
 		include DOL_DOCUMENT_ROOT.'/core/commonfieldsinimport.inc.php';
 		$import_extrafield_sample = array();
-		$keyforselect='myobject'; $keyforaliasextra='extra'; $keyforelement='myobject@cyphtWebmail';
+		$keyforselect='myobject'; $keyforaliasextra='extra'; $keyforelement='myobject@cyphtwebmail';
 		include DOL_DOCUMENT_ROOT.'/core/extrafieldsinimport.inc.php';
 		$this->import_fieldshidden_array[$r] = array('extra.fk_object' => 'lastrowid-'.$this->db->prefix().'cyphtWebmail_myobject');
 		$this->import_regex_array[$r] = array();
@@ -604,9 +604,9 @@ class modcyphtWebmail extends DolibarrModules
 			't.ref' => array(
 				'rule'=>'getrefifauto',
 				'class'=>(!getDolGlobalString('cyphtWebmail_MYOBJECT_ADDON') ? 'mod_myobject_standard' : getDolGlobalString('cyphtWebmail_MYOBJECT_ADDON')),
-				'path'=>"/core/modules/cyphtWebmail/".(!getDolGlobalString('cyphtWebmail_MYOBJECT_ADDON') ? 'mod_myobject_standard' : getDolGlobalString('cyphtWebmail_MYOBJECT_ADDON')).'.php',
+				'path'=>"/core/modules/cyphtwebmail/".(!getDolGlobalString('cyphtWebmail_MYOBJECT_ADDON') ? 'mod_myobject_standard' : getDolGlobalString('cyphtWebmail_MYOBJECT_ADDON')).'.php',
 				'classobject'=>'MyObject',
-				'pathobject'=>'/cyphtWebmail/class/myobject.class.php',
+				'pathobject'=>'/cyphtwebmail/class/myobject.class.php',
 			),
 			't.fk_soc' => array('rule' => 'fetchidfromref', 'file' => '/societe/class/societe.class.php', 'class' => 'Societe', 'method' => 'fetch', 'element' => 'ThirdParty'),
 			't.fk_user_valid' => array('rule' => 'fetchidfromref', 'file' => '/user/class/user.class.php', 'class' => 'User', 'method' => 'fetch', 'element' => 'user'),
@@ -631,7 +631,7 @@ class modcyphtWebmail extends DolibarrModules
 
 		// Create tables of module at module activation
 		//$result = $this->_load_tables('/install/mysql/', 'cyphtWebmail');
-		$result = $this->_load_tables('/cyphtWebmail/sql/');
+		$result = $this->_load_tables('/cyphtwebmail/sql/');
 		if ($result < 0) {
 			return -1; // Do not activate module if error 'not allowed' returned when loading module SQL queries (the _load_table run sql with run_sql with the error allowed parameter set to 'default')
 		}
@@ -639,12 +639,12 @@ class modcyphtWebmail extends DolibarrModules
 		// Create extrafields during init
 		//include_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
 		//$extrafields = new ExtraFields($this->db);
-		//$result0=$extrafields->addExtraField('cyphtWebmail_separator1', "Separator 1", 'separator', 1,  0, 'thirdparty',   0, 0, '', array('options'=>array(1=>1)), 1, '', 1, 0, '', '', 'cyphtWebmail@cyphtWebmail', 'isModEnabled("cyphtWebmail")');
-		//$result1=$extrafields->addExtraField('cyphtWebmail_myattr1', "New Attr 1 label", 'boolean', 1,  3, 'thirdparty',   0, 0, '', '', 1, '', -1, 0, '', '', 'cyphtWebmail@cyphtWebmail', 'isModEnabled("cyphtWebmail")');
-		//$result2=$extrafields->addExtraField('cyphtWebmail_myattr2', "New Attr 2 label", 'varchar', 1, 10, 'project',      0, 0, '', '', 1, '', -1, 0, '', '', 'cyphtWebmail@cyphtWebmail', 'isModEnabled("cyphtWebmail")');
-		//$result3=$extrafields->addExtraField('cyphtWebmail_myattr3', "New Attr 3 label", 'varchar', 1, 10, 'bank_account', 0, 0, '', '', 1, '', -1, 0, '', '', 'cyphtWebmail@cyphtWebmail', 'isModEnabled("cyphtWebmail")');
-		//$result4=$extrafields->addExtraField('cyphtWebmail_myattr4', "New Attr 4 label", 'select',  1,  3, 'thirdparty',   0, 1, '', array('options'=>array('code1'=>'Val1','code2'=>'Val2','code3'=>'Val3')), 1,'', -1, 0, '', '', 'cyphtWebmail@cyphtWebmail', 'isModEnabled("cyphtWebmail")');
-		//$result5=$extrafields->addExtraField('cyphtWebmail_myattr5', "New Attr 5 label", 'text',    1, 10, 'user',         0, 0, '', '', 1, '', -1, 0, '', '', 'cyphtWebmail@cyphtWebmail', 'isModEnabled("cyphtWebmail")');
+		//$result0=$extrafields->addExtraField('cyphtWebmail_separator1', "Separator 1", 'separator', 1,  0, 'thirdparty',   0, 0, '', array('options'=>array(1=>1)), 1, '', 1, 0, '', '', 'cyphtwebmail@cyphtwebmail', 'isModEnabled("cyphtWebmail")');
+		//$result1=$extrafields->addExtraField('cyphtWebmail_myattr1', "New Attr 1 label", 'boolean', 1,  3, 'thirdparty',   0, 0, '', '', 1, '', -1, 0, '', '', 'cyphtwebmail@cyphtwebmail', 'isModEnabled("cyphtWebmail")');
+		//$result2=$extrafields->addExtraField('cyphtWebmail_myattr2', "New Attr 2 label", 'varchar', 1, 10, 'project',      0, 0, '', '', 1, '', -1, 0, '', '', 'cyphtwebmail@cyphtwebmail', 'isModEnabled("cyphtWebmail")');
+		//$result3=$extrafields->addExtraField('cyphtWebmail_myattr3', "New Attr 3 label", 'varchar', 1, 10, 'bank_account', 0, 0, '', '', 1, '', -1, 0, '', '', 'cyphtwebmail@cyphtwebmail', 'isModEnabled("cyphtWebmail")');
+		//$result4=$extrafields->addExtraField('cyphtWebmail_myattr4', "New Attr 4 label", 'select',  1,  3, 'thirdparty',   0, 1, '', array('options'=>array('code1'=>'Val1','code2'=>'Val2','code3'=>'Val3')), 1,'', -1, 0, '', '', 'cyphtwebmail@cyphtwebmail', 'isModEnabled("cyphtWebmail")');
+		//$result5=$extrafields->addExtraField('cyphtWebmail_myattr5', "New Attr 5 label", 'text',    1, 10, 'user',         0, 0, '', '', 1, '', -1, 0, '', '', 'cyphtwebmail@cyphtwebmail', 'isModEnabled("cyphtWebmail")');
 
 		// Permissions
 		$this->remove($options);
