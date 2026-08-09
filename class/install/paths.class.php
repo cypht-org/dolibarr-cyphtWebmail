@@ -17,7 +17,7 @@
 
 /**
  * \file        class/install/paths.class.php
- * \ingroup     cyphtWebmail
+ * \ingroup     cyphtwebmail
  * \brief       Path resolution and installed/built-version bookkeeping for
  *              the vendored Cypht app.
  */
@@ -78,7 +78,7 @@ class CyphtPaths
 	 */
 	public function getDataDir()
 	{
-		$dir = DOL_DATA_ROOT . '/cyphtWebmail';
+		$dir = DOL_DATA_ROOT . '/cyphtwebmail';
 
 		require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
 		dol_mkdir($dir . '/users');
