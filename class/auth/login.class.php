@@ -20,7 +20,7 @@ require_once __DIR__ . '/token.class.php';
 
 /**
  * \file        class/auth/login.class.php
- * \ingroup     cyphtWebmail
+ * \ingroup     cyphtwebmail
  * \brief       Logs the current Dolibarr user into Cypht in-process, and
  *              tracks whether a live session already exists.
  */
