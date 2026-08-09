@@ -1,0 +1,16 @@
+/**
+ * Compose screen template picker.
+ *
+ * Scoped to the picker so no other outline button on the site is affected.
+ */
+.dolibarr_mail_templates_picker .btn-outline-primary {
+    --bs-btn-color: var(--bs-primary);
+    --bs-btn-border-color: var(--bs-primary);
+    --bs-btn-hover-bg: var(--bs-primary);
+    --bs-btn-hover-border-color: var(--bs-primary);
+    --bs-btn-active-bg: var(--bs-primary);
+    --bs-btn-active-border-color: var(--bs-primary);
+    --bs-btn-disabled-color: var(--bs-primary);
+    --bs-btn-disabled-border-color: var(--bs-primary);
+    --bs-btn-focus-shadow-rgb: var(--bs-primary-rgb);
+}

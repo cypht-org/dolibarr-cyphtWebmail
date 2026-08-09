@@ -18,6 +18,7 @@
 require_once __DIR__ . '/../install/paths.class.php';
 require_once __DIR__ . '/../auth/token.class.php';
 require_once __DIR__ . '/../integration/contactsource.class.php';
+require_once __DIR__ . '/../integration/mailtemplatesource.class.php';
 
 /**
  * \file        class/install/environment.class.php
@@ -100,8 +101,10 @@ class CyphtEnvironment
 			// the Bootswatch CSS packs; without it the app renders unstyled.
 			// dolibarr_contacts must appear here or config_gen.php never scans
 			// its setup.php, and it must follow "contacts", whose load_contacts
-			// handler it attaches to.
-			'CYPHT_MODULES'    => 'core,contacts,dolibarr_contacts,imap,smtp,api_login,account,nux,developer,history,saved_searches,advanced_search,profiles,inline_message,imap_folders,keyboard_shortcuts,site,dynamic_login,sievefilters,themes',
+			// handler it attaches to. dolibarr_mail_templates has the same scanning
+			// requirement but attaches to core's load_user_data, so its only
+			// ordering constraint is that it follow "core".
+			'CYPHT_MODULES'    => 'core,contacts,dolibarr_contacts,dolibarr_mail_templates,imap,smtp,api_login,account,nux,developer,history,saved_searches,advanced_search,profiles,inline_message,imap_folders,keyboard_shortcuts,site,dynamic_login,sievefilters,themes',
 			'DISABLE_FINGERPRINT' => 'true',
 			'DISABLE_EMPTY_SUPERGLOBALS' => 'true',
 			'SSO_SHARED_SECRET' => $this->token->getOrCreateSsoSecret(),
@@ -115,6 +118,12 @@ class CyphtEnvironment
 			'DOLIBARR_CONTACTS_TTL' => getDolGlobalString('CYPHTWEBMAIL_CONTACTS_TTL', '300'),
 			'DOLIBARR_CONTACTS_TIMEOUT' => getDolGlobalString('CYPHTWEBMAIL_CONTACTS_TIMEOUT', '5'),
 			'DOLIBARR_CONTACTS_INSECURE' => getDolGlobalString('CYPHTWEBMAIL_CONTACTS_INSECURE', 'false'),
+			'DOLIBARR_MAIL_TEMPLATES_URL' => CyphtMailTemplateSource::resolveBridgeUrl(),
+			// Longer than the contacts TTL: an address book changes as people
+			// are added, a template list only when someone edits a template.
+			'DOLIBARR_MAIL_TEMPLATES_TTL' => getDolGlobalString('CYPHTWEBMAIL_MAIL_TEMPLATES_TTL', '900'),
+			'DOLIBARR_MAIL_TEMPLATES_TIMEOUT' => getDolGlobalString('CYPHTWEBMAIL_MAIL_TEMPLATES_TIMEOUT', '5'),
+			'DOLIBARR_MAIL_TEMPLATES_INSECURE' => getDolGlobalString('CYPHTWEBMAIL_MAIL_TEMPLATES_INSECURE', 'false'),
 			// Opened with target="_top" so it escapes the webmail iframe.
 			'DOLIBARR_NEW_CONTACT_URL' => dol_buildpath('/contact/card.php', 2) . '?action=create',
 		);

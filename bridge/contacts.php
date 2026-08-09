@@ -175,7 +175,22 @@ $contacts = array();
  */
 function cyphtBridgeContact($email, $name, $group, $extra)
 {
+	// Hm_Repository::add() falls back to uniqid() for any contact that arrives
+	// without an id, so the same person is given a different id on every
+	// request. That is invisible within one request, which is why autocomplete
+	// works, but the contacts page renders its send-to link with the id from
+	// the request that drew the page, and compose then looks that id up in a
+	// store rebuilt by the *next* request, where it no longer exists. The
+	// lookup misses, no compose_draft is set, and the To field arrives empty.
+	// Deriving the id from the Dolibarr row keeps it stable across both.
+	if (isset($extra['dol_type'], $extra['dol_id'])) {
+		$id = 'dolibarr-'.$extra['dol_type'].'-'.$extra['dol_id'];
+	} else {
+		$id = 'dolibarr-'.md5(strtolower($email));
+	}
+
 	return array(
+		'id'            => $id,
 		'email_address' => $email,
 		'display_name'  => ($name !== '' ? $name : $email),
 		'group'         => $group,
@@ -259,6 +274,79 @@ while ($obj = $db->fetch_object($resql)) {
 }
 $db->free($resql);
 
+// --- 3c. Colleagues (llx_user) --------------------------------------
+// Only name, job and address: a staff directory, not the user record. Without
+// this there is no way to mail a colleague from the webmail, since the two
+// queries above cover customers and their contacts only.
+if (getDolGlobalString('CYPHTWEBMAIL_CONTACTS_INCLUDE_USERS', 'true') === 'true') {
+	$sql = "SELECT u.rowid, u.lastname, u.firstname, u.email, u.job";
+	$sql .= " FROM ".MAIN_DB_PREFIX."user as u";
+	// Same clause as Form::select_dolusers(), html.form.class.php:2753.
+	$sql .= " WHERE u.entity IN (".getEntity('user').")";
+	$sql .= " AND u.email IS NOT NULL AND u.email <> ''";
+	$sql .= " AND u.statut = 1";
+	if ($searchSql !== '') {
+		$sql .= " AND (u.email LIKE ".$searchSql." OR u.lastname LIKE ".$searchSql;
+		$sql .= " OR u.firstname LIKE ".$searchSql.")";
+	}
+	$sql .= " ORDER BY u.lastname, u.firstname";
+	$sql .= $db->plimit($maxRows, 0);
+
+	$resql = $db->query($sql);
+	if (!$resql) {
+		cyphtBridgeRespond(500, array('error' => 'User query failed: '.$db->lasterror()));
+	}
+	while ($obj = $db->fetch_object($resql)) {
+		$name = trim($obj->firstname.' '.$obj->lastname);
+		$contacts[] = cyphtBridgeContact(
+			$obj->email,
+			$name,
+			'Dolibarr users',
+			array(
+				'dol_type' => 'user',
+				'dol_id'   => (int) $obj->rowid,
+				'dol_job'  => (string) $obj->job,
+			)
+		);
+	}
+	$db->free($resql);
+}
+
+// --- 3d. Members (llx_adherent) -------------------------------------
+if (isModEnabled('member') && $bridgeUser->hasRight('adherent', 'lire')) {
+	$sql = "SELECT a.rowid, a.lastname, a.firstname, a.email, a.societe";
+	$sql .= " FROM ".MAIN_DB_PREFIX."adherent as a";
+	$sql .= " WHERE a.entity IN (".getEntity('adherent').")";
+	$sql .= " AND a.email IS NOT NULL AND a.email <> ''";
+	// Adherent::STATUS_VALIDATED, adherent.class.php:411.
+	$sql .= " AND a.statut = 1";
+	if ($searchSql !== '') {
+		$sql .= " AND (a.email LIKE ".$searchSql." OR a.lastname LIKE ".$searchSql;
+		$sql .= " OR a.firstname LIKE ".$searchSql." OR a.societe LIKE ".$searchSql.")";
+	}
+	$sql .= " ORDER BY a.lastname, a.firstname";
+	$sql .= $db->plimit($maxRows, 0);
+
+	$resql = $db->query($sql);
+	if (!$resql) {
+		cyphtBridgeRespond(500, array('error' => 'Member query failed: '.$db->lasterror()));
+	}
+	while ($obj = $db->fetch_object($resql)) {
+		$name = trim($obj->firstname.' '.$obj->lastname);
+		$contacts[] = cyphtBridgeContact(
+			$obj->email,
+			$name,
+			'Dolibarr members',
+			array(
+				'dol_type'    => 'member',
+				'dol_id'      => (int) $obj->rowid,
+				'dol_company' => (string) $obj->societe,
+			)
+		);
+	}
+	$db->free($resql);
+}
+
 // De-duplicate on address: a contact record wins over the company generic
 // address, because it was added first and carries a real person's name.
 $seen = array();
@@ -272,9 +360,19 @@ foreach ($contacts as $contact) {
 	$unique[] = $contact;
 }
 
+// Each source is capped at $maxRows independently, so the ceiling is the cap
+// times however many actually ran.
+$sourcesQueried = 2;
+if (getDolGlobalString('CYPHTWEBMAIL_CONTACTS_INCLUDE_USERS', 'true') === 'true') {
+	$sourcesQueried++;
+}
+if (isModEnabled('member') && $bridgeUser->hasRight('adherent', 'lire')) {
+	$sourcesQueried++;
+}
+
 cyphtBridgeRespond(200, array(
 	'contacts' => $unique,
 	'count'    => count($unique),
 	'entity'   => (int) $conf->entity,
-	'truncated' => (count($contacts) >= ($maxRows * 2)),
+	'truncated' => (count($contacts) >= ($maxRows * $sourcesQueried)),
 ));

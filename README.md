@@ -240,6 +240,7 @@ a form field.
 | `CYPHTWEBMAIL_SESSION_TTL` | `604800` | session lifetime, seconds |
 | `CYPHTWEBMAIL_SESSION_GC_DIVISOR` | `200` | 1-in-N logins sweep old sessions |
 | `CYPHTWEBMAIL_SESSION_DEBUG` | `false` | verbose session log; leave off |
+| `CYPHTWEBMAIL_CONTACTS_INCLUDE_USERS` | `true` | list Dolibarr users in the address book, so staff can mail each other |
 | `CYPHTWEBMAIL_CONTACTS_TTL` | `300` | contact cache lifetime, seconds |
 | `CYPHTWEBMAIL_CONTACTS_MAX` | `2000` | max contacts fetched |
 | `CYPHTWEBMAIL_CONTACTS_TIMEOUT` | `5` | bridge HTTP timeout |
