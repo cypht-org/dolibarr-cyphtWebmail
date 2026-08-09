@@ -17,7 +17,7 @@
 
 /**
  * \file        class/webmail.class.php
- * \ingroup     cyphtWebmail
+ * \ingroup     cyphtwebmail
  * \brief       Facade over the Dolibarr<->Cypht glue code. Delegates to one
  *              collaborator per subfolder of class/:
  *
