@@ -17,7 +17,7 @@
 
 /**
  * \file        admin/setup.php
- * \ingroup     cyphtWebmail
+ * \ingroup     cyphtwebmail
  * \brief       Setup page: IMAP settings + the "Generate / Rebuild" button
  *              that runs Cypht's config_gen.php through CyphtWebmail.
  */
@@ -50,7 +50,7 @@ if (!$user->admin) {
 	accessforbidden();
 }
 
-$langs->loadLangs(array("admin", "cyphtWebmail@cyphtWebmail"));
+$langs->loadLangs(array("admin", "cyphtwebmail@cyphtwebmail"));
 
 $action = GETPOST('action', 'aZ09');
 $manager = new CyphtWebmail($db);
@@ -221,7 +221,7 @@ if ($canBuildHere) {
 	// in the log from closing this tag early.
 	print '<script type="application/json" id="cyphtwebmail-last-log">'.json_encode($lastBuildLog).'</script>';
 
-	print '<script src="'.dol_buildpath('/cyphtWebmail/js/admin/setup.js', 1).'"></script>';
+	print '<script src="'.dol_buildpath('/cyphtwebmail/js/admin/setup.js', 1).'"></script>';
 }
 
 llxFooter();
