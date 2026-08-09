@@ -18,7 +18,7 @@
 
 /**
  * \file        scripts/build.php
- * \ingroup     cyphtWebmail
+ * \ingroup     cyphtwebmail
  * \brief       Command line build, in two modes.
  *
  *              prepare  Fetch dependencies and install this module's Cypht
