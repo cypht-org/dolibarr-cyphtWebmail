@@ -19,7 +19,7 @@ require_once __DIR__ . '/../install/paths.class.php';
 
 /**
  * \file        class/integration/mailtemplatesource.class.php
- * \ingroup     cyphtWebmail
+ * \ingroup     cyphtwebmail
  * \brief       Installs the "dolibarr_mail_templates" Cypht module set, which puts
  *              Dolibarr's general purpose email templates on the compose
  *              screen.
@@ -88,7 +88,7 @@ class CyphtMailTemplateSource
 			return $url;
 		}
 
-		return dol_buildpath('/cyphtWebmail/bridge/mail_templates.php', 2);
+		return dol_buildpath('/cyphtwebmail/bridge/mail_templates.php', 2);
 	}
 
 }
