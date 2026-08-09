@@ -22,7 +22,7 @@ require_once __DIR__ . '/../integration/mailtemplatesource.class.php';
 
 /**
  * \file        class/install/environment.class.php
- * \ingroup     cyphtWebmail
+ * \ingroup     cyphtwebmail
  * \brief       Builds and writes Cypht's .env file from Dolibarr constants.
  */
 class CyphtEnvironment
