@@ -17,7 +17,7 @@
 
 /**
  * \file        index.php
- * \ingroup     cyphtWebmail
+ * \ingroup     cyphtwebmail
  * \brief       Entry point reached from the top menu. Logs the current
  *              Dolibarr user into Cypht via SSO (see
  *              CyphtWebmail::performSsoLogin()) before embedding the
@@ -45,7 +45,7 @@ require_once __DIR__.'/class/webmail.class.php';
 
 global $conf, $db, $langs, $user;
 
-$langs->loadLangs(array("cyphtWebmail@cyphtWebmail"));
+$langs->loadLangs(array("cyphtwebmail@cyphtwebmail"));
 
 // Module-level gate for this POC: any logged in user, as long as the module
 // is enabled. No dedicated permission has been added yet (task for later,
@@ -71,7 +71,7 @@ if (!is_string($cyphtQuery) || !preg_match('/^[A-Za-z0-9_\-\.=&%+]{0,300}$/', $c
 $ssoOk = false;
 $publicUrl = '';
 if ($manager->isPublished()) {
-	$publicUrl = dol_buildpath('/cyphtWebmail/public/index.php', 1);
+	$publicUrl = dol_buildpath('/cyphtwebmail/public/index.php', 1);
 	$ssoOk = $manager->performSsoLogin($user->login, $publicUrl);
 }
 
@@ -80,7 +80,7 @@ llxHeader('', $langs->trans("CyphtWebmailArea"), '', '', 0, 0, '', '', '', 'mod-
 if (!$manager->isPublished()) {
 	print '<div class="warning" style="padding: 15px;">';
 	print $langs->trans("CyphtWebmailNotYetBuilt");
-	print ' <a href="'.dol_buildpath('/cyphtWebmail/admin/setup.php', 1).'">';
+	print ' <a href="'.dol_buildpath('/cyphtwebmail/admin/setup.php', 1).'">';
 	print $langs->trans("CyphtWebmailGoToSetup");
 	print '</a>';
 	print '</div>';
@@ -98,7 +98,7 @@ if (!$manager->isPublished()) {
 		'style="width:100%; height: calc(100vh - 220px); min-height: 500px; border: none;" '.
 		'title="Cypht Webmail"></iframe>';
 
-	$syncScript = dol_buildpath('/cyphtWebmail/js/cypht-url-sync.js', 1);
+	$syncScript = dol_buildpath('/cyphtwebmail/js/cypht-url-sync.js', 1);
 	$syncVersion = @filemtime(__DIR__.'/js/cypht-url-sync.js');
 
 	print '<script src="'.dol_escape_htmltag($syncScript.($syncVersion ? '?v='.$syncVersion : '')).'"></script>';
