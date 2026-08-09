@@ -19,7 +19,7 @@ require_once __DIR__ . '/../install/paths.class.php';
 
 /**
  * \file        class/auth/token.class.php
- * \ingroup     cyphtWebmail
+ * \ingroup     cyphtwebmail
  * \brief       Shared secrets and the short-lived HMAC assertions that prove
  *              a request belongs to a given Dolibarr user.
  */
