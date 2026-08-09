@@ -81,12 +81,20 @@ class CyphtPipeline
 	 * @param CyphtUpstreamPatches $upstreamPatcher
 	 * @param CyphtModuleInstaller $moduleInstaller
 	 */
+	/**
+	 * $db, $envConfig and $login are nullable because the compile half of this
+	 * class does not use them: runConfigGen() touches no member at all, and
+	 * publishSite() only needs $paths and $vendorBridge. That lets an offline
+	 * build, which has no Dolibarr and therefore no database handle, token
+	 * store or login helper, still drive a real compile. Anything that does
+	 * need them is guarded by requireDolibarr().
+	 */
 	public function __construct(
 		$db,
 		CyphtPaths $paths,
-		CyphtEnvironment $envConfig,
+		?CyphtEnvironment $envConfig,
 		CyphtVendorLayout $vendorBridge,
-		CyphtLogin $login,
+		?CyphtLogin $login,
 		CyphtUpstreamPatches $upstreamPatcher,
 		CyphtModuleInstaller $moduleInstaller
 	) {
@@ -561,7 +569,66 @@ class CyphtPipeline
 
 		$this->vendorBridge->copyRecursive($sitePath, $publicPath);
 
-		return file_exists($publicPath . '/index.php');
+		if (!file_exists($publicPath . '/index.php')) {
+			$this->error = 'Publish copied no index.php into ' . $publicPath;
+			return false;
+		}
+
+		return $this->makeIndexRelocatable($publicPath . '/index.php');
+	}
+
+	/**
+	 * Replace the one absolute path in the published entry point with an
+	 * expression that resolves itself.
+	 *
+	 * config_gen.php bakes the build machine's own directory into the entry
+	 * point (scripts/config_gen.php:658 substitutes APP_PATH into a template
+	 * that ships empty). That single define is the only thing in the whole
+	 * build output tied to where it was built: config/dynamic.php, all 12k
+	 * lines of it, contains no paths at all. So rewriting this one line is
+	 * what makes a compiled build portable, and therefore shippable.
+	 *
+	 * public/ always sits directly under the module root, so dirname(__DIR__)
+	 * is the module root wherever it has been installed.
+	 *
+	 * @param string $indexFile Published public/index.php
+	 * @return bool
+	 */
+	private function makeIndexRelocatable($indexFile)
+	{
+		$content = file_get_contents($indexFile);
+		if ($content === false) {
+			$this->error = 'Could not read ' . $indexFile;
+			return false;
+		}
+
+		$replacement = "define('APP_PATH', dirname(__DIR__).'/vendor/jason-munro/cypht/');";
+
+		/* Matched on the define rather than on the path itself: the baked value
+		 * carries the build host's separators, which differ between Windows and
+		 * POSIX, and would otherwise need escaping to match. */
+		$patched = preg_replace(
+			"/define\(\s*'APP_PATH'\s*,\s*'[^']*'\s*\);/",
+			$replacement,
+			$content,
+			1,
+			$count
+		);
+
+		if ($patched === null || $count !== 1) {
+			/* Upstream changed the shape of the define. Failing loudly beats
+			 * publishing a build that only runs on this machine. */
+			$this->error = 'Could not rewrite APP_PATH in ' . $indexFile .
+				' (matched ' . (int) $count . ' times). Cypht\'s entry point template may have changed.';
+			return false;
+		}
+
+		if (file_put_contents($indexFile, $patched) === false) {
+			$this->error = 'Could not write ' . $indexFile;
+			return false;
+		}
+
+		return true;
 	}
 
 	/**
@@ -740,10 +807,19 @@ class CyphtPipeline
 		// ---- Step 2/3: config_gen.php ----
 		$emit("\n== Step 2/3: php scripts/config_gen.php ==\n");
 
-		if (!$this->envConfig->writeEnvFile($this->envConfig->buildEnvOverrides())) {
-			$this->error = $this->envConfig->error;
-			$emit($this->error . "\n", 'err');
-			return array('success' => false, 'output' => $log, 'error' => $this->error);
+		/* Offline builds arrive here with no envConfig and a .env already
+		 * holding the build defaults, which is all config_gen.php reads. Only
+		 * a Dolibarr-backed build can write the installation half, so skip
+		 * rather than fail: the alternative is refusing to compile at all
+		 * without a database. */
+		if ($this->envConfig !== null) {
+			if (!$this->envConfig->writeEnvFile($this->envConfig->buildEnvOverrides())) {
+				$this->error = $this->envConfig->error;
+				$emit($this->error . "\n", 'err');
+				return array('success' => false, 'output' => $log, 'error' => $this->error);
+			}
+		} else {
+			$emit("no Dolibarr: keeping the build defaults already in .env\n");
 		}
 
 		if (!$this->vendorBridge->ensureCyphtVendorBridge()) {
