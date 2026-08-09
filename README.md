@@ -17,11 +17,7 @@ Cypht is LGPL-2.1, Dolibarr is GPL-3.0. This module is GPL-3.0.
 - [Installation](#installation)
 - [Setup and first build](#setup-and-first-build)
 - [Daily use](#daily-use)
-- [How it works](#how-it-works)
 - [Where data is stored](#where-data-is-stored)
-- [Adding a new Cypht module set](#adding-a-new-cypht-module-set)
-- [Adding a new bridge endpoint](#adding-a-new-bridge-endpoint)
-- [Project layout](#project-layout)
 - [Configuration reference](#configuration-reference)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
@@ -40,66 +36,72 @@ Cypht is LGPL-2.1, Dolibarr is GPL-3.0. This module is GPL-3.0.
 
 ## Requirements
 
+To run it:
+
 - Dolibarr 19+ (developed against **24.0**)
 - PHP 8.0+ with `curl`, `openssl`, `mbstring`, `dom`, `PDO`
-- **PHP CLI on the server** - the build step shells out to `php scripts/config_gen.php`
-- **Composer** available to the webserver user, or a `composer.phar` in the module root
 - MySQL/MariaDB or PostgreSQL (whatever Dolibarr already uses)
-- `proc_open()` and `exec()` enabled (commonly disabled on shared hosting)
+
+To build it, additionally:
+
+- a **PHP CLI binary**, which the build invokes to run Cypht's `config_gen.php`
+- **Composer**, or a `composer.phar` in the module root, or a `vendor/` that was
+  prepared elsewhere
+- `proc_open()` and `exec()` enabled
+
+Only whichever side runs the build needs those three. Shared hosting often
+disables `proc_open()` for the webserver, which is why the build can also be run
+from a terminal.
 
 ## Installation
 
-### 1. Put the module in Dolibarr's custom folder
+### 1. Put the module in an external modules directory
 
-The module must sit in Dolibarr's `custom` directory - the same place every
-external Dolibarr module goes:
-
-```
-<dolibarr>/htdocs/custom/cyphtWebmail
-```
-
-For a typical XAMPP install that is:
-
-```
-C:\xampp\htdocs\dolibarr\htdocs\custom\cyphtWebmail
-```
-
-Clone or copy it there:
-
-```bash
-cd <dolibarr>/htdocs/custom
-git clone <repository-url> cyphtWebmail
-```
-
-Confirm `custom` is enabled in `<dolibarr>/htdocs/conf/conf.php`:
+The module goes in one of Dolibarr's external module directories, set by
+`$dolibarr_main_document_root_alt` in `<dolibarr>/htdocs/conf/conf.php`:
 
 ```php
 $dolibarr_main_document_root_alt = '/path/to/dolibarr/htdocs/custom';
 ```
 
-### 2. Install the PHP dependencies
-
-Cypht itself is a Composer dependency, not vendored in git:
+Clone or copy it there:
 
 ```bash
-cd <dolibarr>/htdocs/custom/cyphtWebmail
-composer install
+cd dolibarr/.../<your external modules directory>
+git clone <repository-url> cyphtWebmail
 ```
 
-This pulls `jason-munro/cypht` into `vendor/`. You can skip this step if
-Composer is reachable by the webserver - the build does it for you.
+If the module is not in the tree below Dolibarr, `scripts/build.php` cannot find
+it on its own; pass `--dolibarr=/path/to/htdocs`. See
+[Building from the command line](#building-from-the-command-line).
 
 If you received the module as an archive it may already contain `vendor/`. If it
 also contains `public/`, it was packaged wrongly; see
 [Build where it will run](#build-where-it-will-run).
 
-### 3. Enable the module
+### 2. Enable the module
 
 **Home → Setup → Modules/Applications → Interfaces**, find **CyphtWebmail**,
 switch it on.
 
-Enabling creates the database tables (`sql/*.sql` runs automatically), registers
-the triggers, and adds the menu entries.
+Enabling creates the database tables, registers the triggers and adds the menu
+entries. The build does none of that, so this step cannot be skipped.
+
+### 3. Build it
+
+Cypht ships as source and has to be compiled before it will run. From a
+terminal, on the machine that will serve it:
+
+```bash
+cd <module directory>
+php scripts/build.php
+```
+
+Or press **Generate** on the setup page. Either route pulls the Composer
+dependencies too, so there is no separate `composer install` step.
+
+[Setup and first build](#setup-and-first-build) covers what the build does and
+when to run it again.
 
 ## Setup and first build
 
@@ -119,19 +121,19 @@ This is where everything is configured and built. It has:
 
 ### Press Generate
 
-Cypht is not usable as shipped; it has to be compiled. Generate runs three
-steps and streams the log:
+Generate runs three steps and streams the log:
 
 1. `composer install` - fetches/updates Cypht
-2. `php scripts/config_gen.php` - Cypht compiles its enabled module sets into
-   `config/dynamic.php` plus bundled `site.css` / `site.js`
+2. `vendor/jason-munro/cypht/scripts/config_gen.php` - Cypht compiles its
+   enabled module sets into `config/dynamic.php` plus bundled `site.css` /
+   `site.js`. This is Cypht's own script, not the module's `scripts/build.php`
 3. **publish** - copies the built `site/` into `public/`, which is what the
    browser actually loads
 
 Before step 2 the module also writes Cypht's `.env` from Dolibarr's settings,
 bridges the flat Composer layout, and installs its own Cypht module sets.
 
-**You must press Generate after:**
+**Build again after:**
 
 - installing or updating the module
 - changing anything on the setup page
@@ -140,14 +142,9 @@ bridges the flat Composer layout, and installs its own Cypht module sets.
 
 ### Building from the command line
 
-`scripts/build.php` does everything the Generate button does, without a browser.
-Use it when `proc_open()` is disabled for the webserver, when the setup page
-shows the shell command instead of the button, or from a deploy script.
-
-```bash
-cd <dolibarr>/htdocs/custom/cyphtWebmail
-php scripts/build.php
-```
+`php scripts/build.php` does the same three steps without a browser. When the
+webserver cannot build, the setup page shows this command in place of the
+button.
 
 | Option | What it does |
 |---|---|
@@ -179,13 +176,9 @@ To package the module, stop before anything is compiled:
 php scripts/build.php --prepare      # then zip
 ```
 
-`--prepare` ends before `.env` and `public/` exist, so the archive ships
-`vendor/` and the Cypht module sets and nothing sensitive. The target machine
-then needs neither Composer nor network access, just:
-
-```bash
-php scripts/build.php
-```
+`--prepare` ends before `.env` and `public/` exist, so the archive carries
+`vendor/` and the Cypht module sets and nothing sensitive. Whoever unpacks it
+runs a normal build, needing neither Composer nor network access.
 
 If you already zipped a built tree, delete `vendor/jason-munro/cypht/.env` and
 `public/` from the archive before it goes anywhere.
@@ -207,36 +200,6 @@ Cypht supports IMAP, JMAP and EWS for reading, SMTP for sending.
 The left column carries the Dolibarr side of the workflow - open tickets,
 overdue invoices, agenda, the email collector, email templates, mass emailing
 and module setup. It deliberately does not repeat Cypht's own navigation.
-
-## How it works
-
-```
-Dolibarr page (index.php)
-  │  performSsoLogin()  ── HMAC token ──▶  Cypht cypht_login()
-  │
-  └─ <iframe> ──▶ public/index.php  (the built Cypht app)
-                      │
-                      ├─ Custom_Auth          verifies the HMAC token
-                      ├─ Custom_Session       own session files
-                      ├─ Custom_User_Config   reads/writes llx_cyphtwebmail_userconfig
-                      └─ dolibarr_contacts    HTTP ──▶ bridge/contacts.php
-```
-
-**Single sign-on.** Dolibarr mints a 60-second HMAC token proving "this is user
-X", signed with a shared secret in `llx_const`. Cypht's `Custom_Auth` verifies
-it in place of a password. No mailbox credential is involved.
-
-**Why the overrides exist.** Cypht encrypts its settings file with the user's
-login password. Under SSO there is no such password - the token is different on
-every request - so nothing could ever be decrypted again. `Custom_User_Config`
-replaces that with database storage keyed on the Dolibarr user id, encrypting
-only the mailbox passwords. Tiki's Cypht integration solves the same problem the
-same way.
-
-**Why an iframe.** Cypht ships its own Bootstrap 5 bundle and emits a full HTML
-document. Inlining it means reconciling two complete CSS frameworks and two
-session models. The iframe is what keeps them apart. The URL sync
-(`?cypht=page%3Dcontacts`) gives back reload and bookmarking.
 
 ## Where data is stored
 
@@ -261,153 +224,6 @@ JOIN llx_user u ON u.rowid = c.fk_user;
 
 **Mail itself is never stored locally.** It stays on the IMAP server.
 
-## Adding a new Cypht module set
-
-This is the main extension point. A module set is Cypht's own plugin format -
-see the [Cypht module docs](https://cypht.org/modules/) and the sets under
-`vendor/jason-munro/cypht/modules/` for working examples.
-
-### 1. Create the folder
-
-```
-cypht/modules/<your_module>/
-```
-
-Mirror the native layout exactly:
-
-| File | Required | Purpose |
-|---|---|---|
-| `README.md` | recommended | what the module set does |
-| `setup.php` | **yes** | registers handlers/outputs and returns input filters |
-| `modules.php` | **yes** | the handler and output classes |
-| `hm-<name>.php` | optional | library classes, required from `modules.php` |
-| `site.css`, `site.js` | optional | concatenated into the build |
-
-Good models to copy: `gmail_contacts` (smallest complete set), `ldap_contacts`
-(a full contact source), `site` (overriding shipped behaviour).
-
-### 2. Register it
-
-Add the name to `CYPHT_MODULES` in
-`class/install/environment.class.php`:
-
-```php
-'CYPHT_MODULES' => 'core,contacts,dolibarr_contacts,<your_module>,imap,smtp,...',
-```
-
-**Order matters.** A module set must come *after* anything it attaches to. A
-contact source must follow `contacts`, because it hooks that module's
-`load_contacts` handler.
-
-If it is missing from this list, `config_gen.php` never scans its `setup.php`
-and it is silently ignored.
-
-### 3. Press Generate
-
-`CyphtModuleInstaller` discovers module sets by globbing `cypht/modules/*` and
-copies every file it finds. **No PHP change is needed** to install a new one -
-creating the folder and adding it to `CYPHT_MODULES` is the whole job.
-
-Files are merged into the destination, not replaced, which is how
-`cypht/modules/site/lib.php` overrides one file of a set Cypht already ships
-without disturbing its `modules.php`, `setup.php` or `site.js`.
-
-### 4. Verify
-
-```bash
-ls vendor/jason-munro/cypht/modules/<your_module>/
-grep "<your_handler>" vendor/jason-munro/cypht/config/dynamic.php
-```
-
-The build log also names what it installed:
-
-```
-Cypht module sets installed: dolibarr_contacts, site.
-```
-
-## Adding a new bridge endpoint
-
-Cypht runs as its own application and has no Dolibarr context. When a module
-set needs Dolibarr data, it calls an endpoint under `bridge/` over HTTP. That
-keeps permission checks, entity scoping and schema knowledge on the Dolibarr
-side. `bridge/contacts.php` is the reference implementation.
-
-An endpoint must:
-
-1. Define the `NOLOGIN` family of constants and load `main.inc.php`
-2. Verify an HMAC assertion - **with its own purpose tag**, so a token minted
-   for one endpoint cannot be replayed against another:
-
-   ```php
-   $expected = hash_hmac('sha256', $login.'|'.$timestamp.'|contacts', $secret);
-   ```
-
-3. Enforce a 60-second replay window
-4. Resolve the user, realign `$conf->entity`, and check the relevant permission
-5. Return JSON, `no-store`
-
-Read the value with a strict filter - `aZ09arobase` for a login, `aZ09` for a
-token. Do **not** use `alpha`; it runs HTML-stripping passes that will mangle a
-signature.
-
-Then expose the URL as an env key in `buildEnvOverrides()` and read it in your
-module set with `Hm_Environment::get()`.
-
-## Project layout
-
-```
-cyphtWebmail/
-├── index.php                       the Dolibarr page hosting the Cypht iframe
-├── admin/
-│   ├── setup.php                   settings, build status, Generate button
-│   └── build/                      endpoints the Generate button calls
-│       ├── build.php               runs the build, streams the log
-│       └── build_cancel.php
-├── bridge/                         HTTP endpoints Cypht calls back into Dolibarr
-│   └── contacts.php
-├── class/
-│   ├── webmail.class.php           facade; every caller uses this
-│   ├── auth/                       secrets, HMAC assertions, SSO login
-│   │   ├── token.class.php
-│   │   └── login.class.php
-│   ├── install/                    everything that builds or installs
-│   │   ├── paths.class.php         paths, installed/built version bookkeeping
-│   │   ├── environment.class.php   builds and writes Cypht's .env
-│   │   ├── vendorlayout.class.php  flat-Composer-layout bridge
-│   │   ├── moduleinstaller.class.php  installs cypht/modules/* into vendored Cypht
-│   │   ├── upstreampatches.class.php  patches upstream Cypht gaps
-│   │   └── pipeline.class.php      the three-step build
-│   └── integration/                Dolibarr data exposed to Cypht
-│       └── contactsource.class.php
-├── core/
-│   ├── modules/                    Dolibarr module descriptor
-│   └── triggers/                   USER_DELETE / USER_MODIFY cleanup
-├── cypht/modules/                  ★ our Cypht module sets, native layout
-│   ├── dolibarr_contacts/          contacts as a Cypht address book
-│   └── site/                       session, auth and DB-backed user config
-├── scripts/
-│   └── build.php                   command line build, see above
-├── js/                             browser code for the Dolibarr-side pages
-│   ├── cypht-url-sync.js           keeps the URL in step with the iframe
-│   └── admin/setup.js              build page
-├── langs/en_US/                    translations
-├── sql/                            table definitions, run on activation
-├── docs/upstream-patches/    
-├── composer.json                   the jason-munro/cypht version constraint
-├── composer.lock                   the exact version a build resolves to
-├── public/                         built app (generated, git-ignored)
-└── vendor/                         Composer (Cypht lives here, git-ignored)
-```
-
-The split inside `class/` is the one worth keeping to. `install/` is everything
-that puts Cypht on disk and compiles it, `auth/` is everything that proves who a
-user is, `integration/` is Dolibarr data made available to Cypht. New bridge
-endpoints get a class in `integration/`, not in `install/`.
-
-Front-end code belongs in `js/`, loaded with `dol_buildpath()` and a `filemtime`
-cache-buster, never inlined into a PHP string. Anything that runs inside Cypht
-instead goes in a module set under `cypht/modules/`.
-
 ## Configuration reference
 
 Set through the setup page, or in **Home → Setup → Other** for the ones without
@@ -424,6 +240,7 @@ a form field.
 | `CYPHTWEBMAIL_SESSION_TTL` | `604800` | session lifetime, seconds |
 | `CYPHTWEBMAIL_SESSION_GC_DIVISOR` | `200` | 1-in-N logins sweep old sessions |
 | `CYPHTWEBMAIL_SESSION_DEBUG` | `false` | verbose session log; leave off |
+| `CYPHTWEBMAIL_CONTACTS_INCLUDE_USERS` | `true` | list Dolibarr users in the address book, so staff can mail each other |
 | `CYPHTWEBMAIL_CONTACTS_TTL` | `300` | contact cache lifetime, seconds |
 | `CYPHTWEBMAIL_CONTACTS_MAX` | `2000` | max contacts fetched |
 | `CYPHTWEBMAIL_CONTACTS_TIMEOUT` | `5` | bridge HTTP timeout |
@@ -444,11 +261,11 @@ A crashed build left `documents/cyphtWebmail/build.lock` behind. It is ignored
 automatically after 420 seconds, or delete it.
 
 **Menu entries or permissions did not change.**
-Deactivate and reactivate the module. They are written to `llx_menu` on
-activation only.
+Deactivate and reactivate; see
+[Reactivate after descriptor changes](#reactivate-after-descriptor-changes).
 
 **Changes under `cypht/modules/` have no effect.**
-Press Generate. Those files are copied into Cypht at build time.
+Build again. Those files are copied into Cypht at build time.
 
 **Contacts do not appear.**
 Open `bridge/contacts.php` directly in a browser - it should answer
@@ -463,44 +280,12 @@ stored passwords cannot be decrypted and are blanked so Cypht re-prompts.
 Garbage collection is probabilistic. Lower `CYPHTWEBMAIL_SESSION_GC_DIVISOR` to
 sweep more often.
 
+If none of these fit, [How it works](CONTRIBUTING.md#how-it-works) walks through
+SSO, the iframe and the build pipeline, which is usually enough to place a fault.
+
 ## Contributing
 
-### Conventions
-
-- Follow Dolibarr's coding style: tabs, `array()`, `dol_escape_htmltag()` on
-  output, `GETPOST()` with an explicit filter on input.
-- **Never edit `vendor/jason-munro/cypht/`.** It is Composer-managed and a
-  `composer update` will silently revert you. Put changes in `cypht/modules/`
-  and let the installer deploy them.
-- Copy the query shape from Dolibarr core rather than reconstructing SQL -
-  column names and module keys are not always what they look like. The invoice
-  module key is `invoice` while its permission is still `facture`.
-- One concern per class. Installing module sets belongs in
-  `CyphtModuleInstaller`, not in whichever bridge happened to need it first.
-- No code inside strings. PHP, JS and CSS each live in their own file so an
-  editor can highlight them and a linter can read them.
-- Comments state constraints, not history. "Must not remove servers: this
-  config is the only store" is useful; "this used to work differently" is not.
-
-### Working on the Cypht side
-
-The module sets in `cypht/modules/` are ordinary PHP files - editable and
-syntax-highlighted. They are copied into the vendored Cypht by the installer;
-they are never loaded by Dolibarr itself.
-
-Useful upstream reading:
-
-- Module sets: `vendor/jason-munro/cypht/modules/*/setup.php`
-- Handler/output base classes: `vendor/jason-munro/cypht/lib/modules.php`
-- Routing: `vendor/jason-munro/cypht/lib/dispatch.php`
-- Build: `vendor/jason-munro/cypht/scripts/config_gen.php`
-
-### Testing checklist
-
-- [ ] Build completes, `public/` refreshed
-- [ ] SSO logs in without a Cypht login screen
-- [ ] Mail lists and messages load
-- [ ] Contacts appear under Personal Addresses with source `dolibarr`
-- [ ] Compose autocomplete finds a Dolibarr contact
-- [ ] Reload keeps the current Cypht page
-- [ ] Deleting a test user removes their `llx_cyphtwebmail_userconfig` row
+Everything about changing this module lives in
+[CONTRIBUTING.md](CONTRIBUTING.md): the project layout, how the pieces fit
+together, how to add a Cypht module set or a bridge endpoint, the coding
+conventions, and the checklist to run before opening a PR.
