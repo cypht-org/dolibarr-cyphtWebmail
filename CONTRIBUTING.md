@@ -17,7 +17,7 @@ why, and the rest of this file assumes it.
 ## Project layout
 
 ```
-cyphtWebmail/
+cyphtwebmail/
 ├── index.php                       the Dolibarr page hosting the Cypht iframe
 ├── admin/
 │   ├── setup.php                   settings, build status, Generate button
