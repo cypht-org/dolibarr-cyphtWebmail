@@ -179,14 +179,9 @@ $contacts = array();
  */
 function cyphtBridgeContact($email, $name, $group, $extra)
 {
-	// Hm_Repository::add() falls back to uniqid() for any contact that arrives
-	// without an id, so the same person is given a different id on every
-	// request. That is invisible within one request, which is why autocomplete
-	// works, but the contacts page renders its send-to link with the id from
-	// the request that drew the page, and compose then looks that id up in a
-	// store rebuilt by the *next* request, where it no longer exists. The
-	// lookup misses, no compose_draft is set, and the To field arrives empty.
-	// Deriving the id from the Dolibarr row keeps it stable across both.
+	// Ids must be derived, not generated: Hm_Repository::add() falls back to
+	// uniqid() when one is missing, so the send-to link on the contacts page
+	// points at an id the next request no longer has and compose opens empty.
 	if (isset($extra['dol_type'], $extra['dol_id'])) {
 		$id = 'dolibarr-'.$extra['dol_type'].'-'.$extra['dol_id'];
 	} else {

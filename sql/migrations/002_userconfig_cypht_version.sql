@@ -15,13 +15,8 @@
 --
 -- Migration 002: record which Cypht version wrote each stored user config.
 --
--- The config column is a JSON blob whose shape belongs to Cypht, not to this
--- module. If a future Cypht changes that shape there is currently no way to
--- tell which rows are in the old form, which turns a writable migration into
--- guesswork. Recording the version costs one small column per row now and is
--- the only thing that makes such a conversion possible later.
---
--- Nullable on purpose: rows written before this column existed genuinely do
--- not know, and a default would be a lie about them.
+-- The config column is a JSON blob whose shape belongs to Cypht. Without
+-- this there is no way to tell which rows predate a format change.
+-- The column is nullable because we don't want to break existing rows
 
 ALTER TABLE llx_cyphtwebmail_userconfig ADD COLUMN cypht_version varchar(32) NULL;

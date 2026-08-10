@@ -19,23 +19,10 @@
  * \file        class/runtime/envbootstrap.class.php
  * \ingroup     cyphtwebmail
  * \brief       Supplies Cypht's per-installation configuration at runtime,
- *              without writing anything to disk.
+ *              from conf.php and the database, without writing to disk.
  *
- *              A shipped build carries only the settings that are the same
- *              everywhere. Everything else, database credentials, generated
- *              secrets, data paths and bridge URLs, is discovered on each
- *              request: the credentials and paths from Dolibarr's own
- *              conf.php, the rest from llx_const.
- *
- *              This exists so an installed module never has to write a file.
- *              Shared hosting routinely denies the webserver write access
- *              inside the web root, and a module that must write its own
- *              configuration to start is a module that cannot be installed
- *              from a zip.
- *
- *              Deliberately plain PHP. It runs before Dolibarr is loaded, so
- *              it cannot use any Dolibarr helper, and before Cypht's
- *              autoloader, so it cannot use any Cypht class.
+ *              Plain PHP by necessity: runs before Dolibarr is loaded and
+ *              before Cypht's autoloader, so it can use neither.
  */
 class CyphtEnvBootstrap
 {
@@ -58,14 +45,9 @@ class CyphtEnvBootstrap
 	}
 
 	/**
-	 * Discover everything and put it in $_ENV.
-	 *
 	 * Hm_Environment::get() reads array_merge($_ENV, $_SERVER) on every call,
-	 * so populating $_ENV before Cypht loads its config is equivalent to
-	 * having written the values into .env, minus the write.
-	 *
-	 * Existing values win. A real .env entry is an explicit operator override
-	 * and must not be silently replaced by something derived.
+	 * so populating $_ENV before Cypht loads its config replaces the .env
+	 * write. Existing values win, so a real .env entry stays an override.
 	 *
 	 * @return bool True if the per-installation values are now available
 	 */
@@ -110,8 +92,6 @@ class CyphtEnvBootstrap
 	}
 
 	/**
-	 * What the build recorded about itself.
-	 *
 	 * @return array<string,mixed>
 	 */
 	private function readBuildInfo()
@@ -129,8 +109,8 @@ class CyphtEnvBootstrap
 	/**
 	 * Locate and evaluate Dolibarr's conf.php.
 	 *
-	 * Included inside a method so its many $dolibarr_* variables stay local
-	 * rather than polluting the global scope Cypht is about to use.
+	 * Included inside a method so its $dolibarr_* variables stay out of the
+	 * global scope Cypht is about to use.
 	 *
 	 * @return array<string,mixed>|null
 	 */
@@ -177,8 +157,6 @@ class CyphtEnvBootstrap
 	}
 
 	/**
-	 * Where conf.php lives.
-	 *
 	 * The normal layout is <dolibarr>/htdocs/custom/<module>, so conf.php is
 	 * two directories above the module. The environment override exists for
 	 * installations that put the module somewhere else entirely, which the
@@ -209,13 +187,10 @@ class CyphtEnvBootstrap
 	}
 
 	/**
-	 * The values conf.php alone can answer: how to reach the database, where
-	 * Dolibarr keeps its data, and what URL it is served from.
+	 * The values conf.php alone can answer.
 	 *
-	 * Deriving the paths rather than storing them is deliberate. A stored
-	 * absolute path goes stale the moment the installation is moved or
-	 * restored somewhere else, and stale is worse than absent because it
-	 * fails later and less clearly.
+	 * Paths are derived rather than stored: a stored absolute path goes stale
+	 * when the installation moves, and stale fails later than absent.
 	 *
 	 * @param array<string,mixed> $conf
 	 * @return array<string,string>
@@ -244,19 +219,13 @@ class CyphtEnvBootstrap
 	/**
 	 * The stored half: generated secrets and whatever the setup page saved.
 	 *
-	 * These already live in llx_const, written at activation and whenever the
-	 * setup form is saved, so there is nothing new to persist and no second
-	 * table to keep in step.
-	 *
 	 * @param array<string,mixed> $conf
 	 * @return array<string,string>|null Null if the database was unreachable
 	 */
 	private function readConsts(array $conf)
 	{
-		/* Only the keys this module owns, mapped to the names Cypht expects.
-		 * An allow list rather than a prefix sweep: llx_const is shared, and
-		 * nothing outside this map should be able to reach Cypht's config by
-		 * being named suggestively. */
+		/* An allow list rather than a CYPHTWEBMAIL_% sweep: llx_const is
+		 * shared, so a suggestively named constant must not reach Cypht. */
 		$map = array(
 			'CYPHTWEBMAIL_IMAP_NAME' => 'IMAP_AUTH_NAME',
 			'CYPHTWEBMAIL_IMAP_SERVER' => 'IMAP_AUTH_SERVER',
@@ -313,16 +282,9 @@ class CyphtEnvBootstrap
 	/**
 	 * The module's own configuration table.
 	 *
-	 * Separate from llx_const because dolibarr_set_const() encrypts the value
-	 * of any constant whose name ends in _SECRET, _KEY, _PASS and a few more.
-	 * Dolibarr decrypts them again when it builds $conf->global, so its own
-	 * code never notices, but this reader is deliberately running before
-	 * Dolibarr exists and would get ciphertext. The signed bridge requests
-	 * would then be built from a different secret at each end and every one
-	 * would come back "Bad signature".
-	 *
-	 * Names in this table are already Cypht's own, so the rows map straight
-	 * across.
+	 * Not llx_const: dolibarr_set_const() encrypts anything ending in _SECRET
+	 * or _KEY, and this reader is raw PDO, so it would get ciphertext and
+	 * every signed bridge request would fail on signature.
 	 *
 	 * @param PDO $pdo
 	 * @param array<string,mixed> $conf

@@ -42,11 +42,10 @@ class Hm_Handler_load_dolibarr_mail_templates extends Hm_Handler_Module {
 
         $status = 'ok';
 
-        /* Same reasoning as dolibarr_contacts: without a session cache every
-         * visit to compose is an HTTP round trip to Dolibarr. Templates move
-         * even less than contacts, hence the longer default TTL. The cache
-         * lives in the session, server side, so caching the bodies here is not
-         * the same exposure as putting them in the page. */
+        /* Session cache, as in dolibarr_contacts: otherwise every compose is
+         * an HTTP round trip. Longer default TTL because templates change less
+         * than contacts. Server side, so bodies may be cached here even though
+         * they must not go into the page. */
         $cache = $this->session->get('dolibarr_mail_templates_cache', false);
         $types = $this->session->get('dolibarr_mail_templates_types', array());
         $hint = (string) $this->session->get('dolibarr_mail_templates_hint', '');
@@ -120,11 +119,9 @@ class Hm_Handler_dolibarr_mail_templates_request extends Hm_Handler_Module {
             return;
         }
 
-        /* The index: everything the picker needs to draw and search its list,
-         * and nothing it does not. A row carries no subject and no body, only
-         * a flag saying whether choosing it will bring placeholders with it,
-         * so the warning can be shown next to the name instead of after the
-         * text has already landed in the draft. */
+        /* Index rows carry no subject and no body, only a flag for whether
+         * choosing one brings placeholders, so the picker can warn beside the
+         * name rather than after the text lands in the draft. */
         $wantsIndex = array_key_exists('dolibarr_template_index', $this->request->post);
         if (!$wantsIndex && !$success) {
             return;
@@ -226,13 +223,8 @@ class Hm_Output_dolibarr_mail_templates_picker extends Hm_Output_Module {
             ' data-str-insert="'.$this->html_safe($this->trans('Insert')).'"'.
             '>';
 
-        /* The whole point of the collapsed state: one line that says the
-         * feature exists, says it is optional, and says how much is behind it.
-         * A user who has never heard of Dolibarr templates can read it and
-         * decide; a user who has can ignore it. */
-        /* Outlined, not solid: it has to be findable without competing with
-         * Send, which is the only filled button on this screen and should
-         * stay that way. */
+        /* Outlined, not solid: Send is the only filled button on this screen
+         * and should stay that way. */
         $res .= '<button type="button" id="dolibarr_mail_template_toggle" '.
             'class="btn btn-sm btn-outline-primary">'.
             '<i class="bi bi-file-earmark-text me-1"></i>'.

@@ -182,17 +182,11 @@ print '</td></tr>';
 
 print '</table>';
 
-// Two independent questions about the build controls.
-//
-// Can they work here: Composer, a PHP binary, proc_open() and a writable
-// module directory. checkBuildRequirements() answers that, and it is what
-// hides the controls after a zip deploy, which lands read only.
-//
-// Should they be offered at all: releases ship precompiled, so an ordinary
-// installation never builds and the button is only a way to break a working
-// one. It is a developer tool, shown when Dolibarr itself is not in
-// production mode, with a constant to force it on for someone debugging a
-// production box.
+// The build controls are gated twice: on whether they can work here
+// (checkBuildRequirements, which is what hides them after a read-only zip
+// deploy) and on whether they should be offered at all. Releases ship
+// precompiled, so on an ordinary install the button can only break a working
+// one; it stays a developer tool unless the constant forces it on.
 global $dolibarr_main_prod;
 
 $requirements = $manager->checkBuildRequirements();

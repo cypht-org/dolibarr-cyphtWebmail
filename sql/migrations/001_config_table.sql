@@ -15,17 +15,12 @@
 --
 -- Migration 001: the module configuration table.
 --
--- Duplicates sql/llx_cyphtwebmail_config.sql on purpose. That file is only
--- read when the module is activated, and an upgrade that merely replaced the
--- files never activates anything, so an existing installation would otherwise
--- have new code looking for a table nobody created.
+-- Duplicates sql/llx_cyphtwebmail_config.sql on purpose: that file is only
+-- read on activation, and a files only upgrade never activates.
 --
--- The upgrade runner reads its own version out of this table, and a failed
--- read returns the default of 0, so the ordering works: the read fails, the
--- migration creates the table, and the version is written into it.
---
--- Safe to re-run. run_sql() is called with the default error handling, which
--- lets "table already exists" pass.
+-- Ordering works because CyphtConfig::get() returns its default when the
+-- table is missing: the read fails, this creates it, the version goes in.
+-- Re-runnable; run_sql() lets "already exists" pass.
 
 CREATE TABLE llx_cyphtwebmail_config(
 	rowid              integer AUTO_INCREMENT PRIMARY KEY NOT NULL,

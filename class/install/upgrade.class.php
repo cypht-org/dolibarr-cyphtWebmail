@@ -24,17 +24,11 @@ require_once __DIR__ . '/../auth/token.class.php';
  * \ingroup     cyphtwebmail
  * \brief       Bring an installation up to the schema the code expects.
  *
- *              Dolibarr has no upgrade hook. DolibarrModules offers init()
- *              and remove() and nothing else, so replacing a module's files,
- *              by zip, git pull or rsync, leaves it enabled and runs the new
- *              code against the old database. Nothing is called, and the
- *              failure is silent.
- *
- *              This class is therefore its own trigger: it compares a version
- *              stored in the database against a constant in the code, and does
- *              the outstanding work when they differ. Activation calls it too,
- *              so a fresh install and an upgrade take the same path and there
- *              is only one place where provisioning is described.
+ *              DolibarrModules has no upgrade hook, so replacing the files
+ *              runs new code against the old database with nothing called.
+ *              This compares a stored version against SCHEMA_VERSION and is
+ *              its own trigger. Activation calls it too, so install and
+ *              upgrade share one path.
  */
 class CyphtUpgrade
 {
@@ -66,11 +60,8 @@ class CyphtUpgrade
 	}
 
 	/**
-	 * Run anything outstanding.
-	 *
-	 * The fast path is one indexed read returning a version that already
-	 * matches, which is what happens on all but the first request after an
-	 * upgrade. Cheap enough to sit on a page load.
+	 * Fast path is one indexed read, so this is cheap enough to sit on a page
+	 * load.
 	 *
 	 * @param bool $force Run even when the versions agree, used by activation
 	 * @return bool
@@ -84,9 +75,7 @@ class CyphtUpgrade
 		}
 
 		if ($stored > self::SCHEMA_VERSION) {
-			/* Downgraded code against a newer database. Migrations are
-			 * forward only, so there is nothing safe to do: say so rather
-			 * than run migrations that have already been applied. */
+			/* Migrations are forward only, so there is nothing safe to run. */
 			$this->error = 'This installation is at schema version ' . $stored
 				. ' but the installed code expects ' . self::SCHEMA_VERSION
 				. '. The module files appear to be older than the database.';
@@ -108,12 +97,10 @@ class CyphtUpgrade
 	}
 
 	/**
-	 * Apply sql/migrations/NNN_*.sql in order, skipping any at or below the
-	 * version already recorded.
+	 * Apply sql/migrations/NNN_*.sql in order, skipping any already recorded.
 	 *
-	 * run_sql() is Dolibarr's own runner, used because it rewrites the llx_
-	 * prefix in the file to whatever this installation actually uses. Writing
-	 * the statements by hand would hard code a prefix that is configurable.
+	 * run_sql() rather than hand written queries: it rewrites the llx_ prefix
+	 * to whatever this installation uses.
 	 *
 	 * @param int $from Version already applied
 	 * @return bool
@@ -138,8 +125,7 @@ class CyphtUpgrade
 
 		foreach ($files as $file) {
 			if (!preg_match('/^0*([0-9]+)_/', basename($file), $m)) {
-				/* Unnumbered file: refuse rather than guess an order, because
-				 * migrations applied out of sequence are worse than none. */
+				/* Refuse rather than guess an order. */
 				$this->error = 'Migration file is not numbered: ' . basename($file);
 				return false;
 			}
@@ -161,12 +147,10 @@ class CyphtUpgrade
 	}
 
 	/**
-	 * Create the per-installation state that a shipped build cannot carry.
+	 * Create the per-installation state a shipped build cannot carry.
 	 *
-	 * Idempotent by construction: every getOrCreate returns what already
-	 * exists. That matters most for USER_CONFIG_SECRET, which encrypts every
-	 * stored mailbox password, so regenerating it would empty every account
-	 * in the installation.
+	 * Idempotent: every getOrCreate returns what already exists, which matters
+	 * most for USER_CONFIG_SECRET.
 	 *
 	 * @return bool
 	 */
@@ -178,8 +162,6 @@ class CyphtUpgrade
 			$token->getOrCreateConfigSecret();
 			$token->getOrCreateSiteId();
 
-			// Creates users/ and attachments/ under DOL_DATA_ROOT, which is
-			// outside the web root and writable by the webserver.
 			$paths = new CyphtPaths();
 			$paths->getDataDir();
 		} catch (Exception $e) {

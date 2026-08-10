@@ -78,11 +78,9 @@ class CyphtPaths
 	 */
 	public function getDataDir()
 	{
-		/* An offline build has no Dolibarr and therefore no managed data
-		 * directory. Nothing in that build stores user data; the only caller
-		 * that gets this far is the build lock. Somewhere outside the module
-		 * is deliberate, so a stray lock file cannot end up in a release
-		 * archive. */
+		/* No Dolibarr means no managed data directory. Only the build lock
+		 * gets this far, and it is kept outside the module so it cannot end
+		 * up in a release archive. */
 		if (!defined('DOL_DATA_ROOT')) {
 			$dir = rtrim(sys_get_temp_dir(), '/\\') . '/cyphtwebmail-build';
 			if (!is_dir($dir)) {
@@ -202,10 +200,9 @@ class CyphtPaths
 	 * Filesystem path of a user's Cypht settings file.
 	 *
 	 * MUST stay in step with Custom_User_Config::get_path() in the generated
-	 * modules/site/lib.php: Cypht writes the file, Dolibarr deletes it, and
-	 * neither can see the other's code. The readable prefix is cosmetic; the
-	 * sha256 fragment is what keeps two logins that sanitise identically
-	 * ("jean dupont" and "jean_dupont") from sharing one file.
+	 * modules/site/lib.php: Cypht writes the file, Dolibarr deletes it,
+	 * neither can see the other's code. The sha256 fragment is what stops
+	 * "jean dupont" and "jean_dupont" sharing one file.
 	 *
 	 * @param string $login Dolibarr login
 	 * @return string

@@ -24,9 +24,9 @@ require_once __DIR__ . '/../install/paths.class.php';
  *              Dolibarr's general purpose email templates on the compose
  *              screen.
  *
- *              The module set itself lives in cypht/modules/dolibarr_mail_templates
- *              and is copied into vendor/jason-munro/cypht on every build,
- *              so a "composer update" cannot silently revert it.
+ *              Source lives in cypht/modules/dolibarr_mail_templates and is
+ *              copied into vendor/jason-munro/cypht on every build, so a
+ *              "composer update" cannot silently revert it.
  */
 class CyphtMailTemplateSource
 {

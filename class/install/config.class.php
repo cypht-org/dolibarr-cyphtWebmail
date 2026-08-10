@@ -20,18 +20,9 @@
  * \ingroup     cyphtwebmail
  * \brief       Read and write llx_cyphtwebmail_config from the Dolibarr side.
  *
- *              This table exists because llx_const cannot be used for the
- *              module's secrets. dolibarr_set_const() encrypts the value of
- *              any constant whose name ends in _SECRET, _KEY, _PASS and a
- *              few others, and decrypts it again when building $conf->global.
- *              Dolibarr's own code therefore sees plaintext and never
- *              notices, but the webmail reads its configuration before
- *              Dolibarr is loaded and gets the raw column: ciphertext, and a
- *              shared secret that no longer matches at the two ends.
- *
- *              The runtime side reads the same table over PDO in
- *              CyphtEnvBootstrap. Keys are named as Cypht names them, so
- *              neither side needs a translation table.
+ *              Not llx_const: dolibarr_set_const() encrypts anything ending
+ *              in _SECRET or _KEY, so a reader that runs before Dolibarr gets
+ *              ciphertext. CyphtEnvBootstrap reads this same table.
  */
 class CyphtConfig
 {
@@ -70,8 +61,8 @@ class CyphtConfig
 	}
 
 	/**
-	 * Upsert. The unique index on (entity, name) is what makes the delete
-	 * then insert safe to repeat.
+	 * The unique index on (entity, name) is what makes the delete then
+	 * insert safe to repeat.
 	 *
 	 * @param DoliDB $db
 	 * @param string $name
@@ -109,13 +100,11 @@ class CyphtConfig
 	}
 
 	/**
-	 * Fetch or mint. Used for the three generated secrets, where re-running
-	 * activation must never roll a new value.
+	 * Fetch or mint, never overwrite.
 	 *
-	 * There is deliberately no counterpart that overwrites an existing secret.
-	 * Rotating USER_CONFIG_SECRET without re-encrypting every stored config
-	 * empties every mailbox account in the installation, silently, so the only
-	 * way to do it is to write that migration first.
+	 * There is deliberately no overwriting counterpart: rotating
+	 * USER_CONFIG_SECRET without re-encrypting every stored config empties
+	 * every mailbox account, silently.
 	 *
 	 * @param DoliDB $db
 	 * @param string $name

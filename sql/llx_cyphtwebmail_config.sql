@@ -15,17 +15,12 @@
 --
 -- Installation scoped configuration for the webmail, one row per key.
 --
--- Deliberately not llx_const. dolibarr_set_const() inspects the constant
--- name and silently encrypts the value of anything ending in _KEY, _PASS,
--- _SECRET and a few others (admin.lib.php, the "sensitive constant" branch).
--- Dolibarr decrypts them again when it builds $conf->global, so its own code
--- never notices. The webmail, however, reads this configuration before
--- Dolibarr is loaded, over plain PDO, and would get ciphertext it has no way
--- to unwrap: the shared secret would differ at each end and every signed
--- bridge request would fail with a bad signature.
+-- Not llx_const: dolibarr_set_const() encrypts anything ending in _KEY,
+-- _PASS or _SECRET and decrypts it for $conf->global. The webmail reads its
+-- config over PDO before Dolibarr loads, so it would get ciphertext and every
+-- signed bridge request would fail on signature.
 --
--- Names are the ones Cypht itself uses, so the runtime bootstrap can map a
--- row straight into the environment with no translation table.
+-- Names are Cypht's own, so rows map straight into the environment.
 
 
 CREATE TABLE llx_cyphtwebmail_config(

@@ -80,14 +80,11 @@ class CyphtPipeline
 	 * @param CyphtLogin $login
 	 * @param CyphtUpstreamPatches $upstreamPatcher
 	 * @param CyphtModuleInstaller $moduleInstaller
-	 */
-	/**
-	 * $db, $envConfig and $login are nullable because the compile half of this
-	 * class does not use them: runConfigGen() touches no member at all, and
-	 * publishSite() only needs $paths and $vendorBridge. That lets an offline
-	 * build, which has no Dolibarr and therefore no database handle, token
-	 * store or login helper, still drive a real compile. Anything that does
-	 * need them is guarded by requireDolibarr().
+	 *
+	 * $db, $envConfig and $login are nullable so an offline build can drive a
+	 * compile with no Dolibarr: runConfigGen() reads no member, publishSite()
+	 * only $paths and $vendorBridge. The few places that do need them check
+	 * for null.
 	 */
 	public function __construct(
 		$db,
@@ -164,11 +161,10 @@ class CyphtPipeline
 	}
 
 	/**
-	 * NDJSON log of the most recent build, one {t,c} object per line
-	 * (same format streamed live to the browser; see runProcess()'s
-	 * doc comment for what the types mean). Written incrementally as
-	 * the build runs so the setup page can re-display it after a page
-	 * reload, not just while the original request is open.
+	 * NDJSON log of the most recent build, one {t,c} object per line, in the
+	 * format streamed live to the browser. Written incrementally so the setup
+	 * page can re-display it after a reload, not only while the original
+	 * request is open.
 	 *
 	 * @return string
 	 */
@@ -194,13 +190,11 @@ class CyphtPipeline
 	 *
 	 * @param string[]      $cmd     Command + arguments, each will be escaped
 	 * @param string        $cwd     Working directory to run the command in
-	 * @param callable|null $onChunk Optional callback(string $chunk, string $type),
-	 *                               invoked with new output as soon as it's
-	 *                               read for live streaming. $type is
-	 *                               always 'out', never 'err'. Composer
-	 *                               writes most of its normal output to
-	 *                               stderr, so 'err' is reserved for the
-	 *                               caller's own exit-code-gated messages.
+	 * @param callable|null $onChunk Optional callback(string $chunk, string $type)
+	 *                               for live streaming. $type is always 'out',
+	 *                               never 'err': Composer writes most normal
+	 *                               output to stderr, so 'err' is reserved for
+	 *                               the caller's exit-code-gated messages.
 	 * @return array{success:bool,output:string,error:string,exitcode:int}
 	 */
 	private function runProcess(array $cmd, $cwd, callable $onChunk = null)
@@ -423,19 +417,10 @@ class CyphtPipeline
 	}
 
 	/**
-	 * Locate a real PHP CLI executable. PHP_BINARY is only trustworthy
-	 * under a CLI-like SAPI; under mod_php it resolves to httpd.exe,
-	 * not php.exe.
-	 *
-	 * @return string|null Path to a php executable, or null if none found.
-	 */
-	/**
 	 * Whether this server can build from the browser at all, and why not.
 	 *
-	 * The button needs a PHP CLI binary, Composer, proc_open() and write
-	 * access, any of which a host may withhold. Checking first turns a
-	 * mid-build failure into an upfront answer with the command to run
-	 * instead.
+	 * Checked upfront so a host that withholds one of these gives an answer
+	 * and a command to run, rather than failing mid-build.
 	 *
 	 * @return array{ok:bool,checks:array<int,array{label:string,ok:bool,detail:string}>}
 	 */
@@ -580,19 +565,11 @@ class CyphtPipeline
 	/**
 	 * Record what this build contains, at the module root.
 	 *
-	 * A release is a compiled tree with no database behind it, so nothing else
-	 * says which module version it is or which Cypht went into it.
-	 * CYPHTWEBMAIL_BUILT_VERSION covers that today, but it is written to
-	 * llx_const by a Dolibarr build, so it is simply absent from every
-	 * prebuilt zip.
+	 * CYPHTWEBMAIL_BUILT_VERSION lives in llx_const, so it is absent from a
+	 * prebuilt zip. This file ships with the build instead.
 	 *
-	 * Belongs inside the module directory precisely because it describes the
-	 * build rather than the installation: an upgrade replaces that directory,
-	 * and this file should be replaced along with it.
-	 *
-	 * The module version is read out of the descriptor with a regex rather
-	 * than by loading the class, because an offline build has no Dolibarr and
-	 * DolibarrModules cannot be instantiated without it.
+	 * Version read from the descriptor by regex: an offline build has no
+	 * Dolibarr, so DolibarrModules cannot be instantiated.
 	 *
 	 * @param string|null $cyphtVersion As reported by Composer's installed.json
 	 * @return void
@@ -628,15 +605,9 @@ class CyphtPipeline
 	 * Replace the one absolute path in the published entry point with an
 	 * expression that resolves itself.
 	 *
-	 * config_gen.php bakes the build machine's own directory into the entry
-	 * point (scripts/config_gen.php:658 substitutes APP_PATH into a template
-	 * that ships empty). That single define is the only thing in the whole
-	 * build output tied to where it was built: config/dynamic.php, all 12k
-	 * lines of it, contains no paths at all. So rewriting this one line is
-	 * what makes a compiled build portable, and therefore shippable.
-	 *
-	 * public/ always sits directly under the module root, so dirname(__DIR__)
-	 * is the module root wherever it has been installed.
+	 * config_gen.php:658 bakes the build machine's directory into APP_PATH.
+	 * It is the only build-machine path in the output (config/dynamic.php
+	 * has none), so rewriting this line is what makes a build shippable.
 	 *
 	 * @param string $indexFile Published public/index.php
 	 * @return bool
@@ -675,14 +646,10 @@ class CyphtPipeline
 
 		/* 2. Per-installation SITE_ID.
 		 *
-		 * The bootstrap above has already populated $_ENV, which is why it is
-		 * injected before this define rather than after: SITE_ID is fixed near
-		 * the top of the entry point, long before Cypht loads its own config.
-		 *
-		 * The compiled literal stays as the fallback. It is shared across
-		 * installations and therefore not what we want, but a Cypht that
-		 * starts with a weak site id beats one that will not start at all
-		 * because the database was briefly unreachable. */
+		 * The bootstrap is injected above this define because SITE_ID is set
+		 * near the top of the entry point, before Cypht loads its config.
+		 * The compiled literal stays as a fallback: a weak site id beats not
+		 * starting because the database was briefly unreachable. */
 		$content = preg_replace(
 			"/define\(\s*'SITE_ID'\s*,\s*'([^']*)'\s*\);/",
 			"define('SITE_ID', (isset(\$_ENV['CYPHT_SITE_ID']) && \$_ENV['CYPHT_SITE_ID'] !== '') ? \$_ENV['CYPHT_SITE_ID'] : '$1');",
@@ -803,19 +770,13 @@ class CyphtPipeline
 	}
 
 	/**
-	 * The three-step pipeline: composer install, config_gen.php (Cypht's
-	 * own build step, after the .env/vendor bridge/SSO override/upstream
-	 * patch are written), then publish. Always run together, one code
-	 * path for first install, rebuild, or config changes. Each step is
-	 * timed and streamed to $onProgress as it happens.
+	 * composer install, config_gen.php, publish. Always run together: one
+	 * code path for first install, rebuild and config change alike.
 	 *
-	 * @param callable|null $onProgress callback(string $chunk, string $type).
-	 *                                  $type is 'out' for real child process
-	 *                                  output (passed through from
-	 *                                  runProcess(), see its doc comment),
-	 *                                  'info' for step/progress headers, or
-	 *                                  'err' for failure messages gated on
-	 *                                  a real exit code.
+	 * @param callable|null $onProgress callback(string $chunk, string $type),
+	 *                                  $type being 'out' (child process
+	 *                                  output), 'info' (step headers) or
+	 *                                  'err' (gated on a real exit code).
 	 * @return array{success:bool,output:string,error:string}
 	 */
 	private function runConfigGenSteps(callable $onProgress = null)
@@ -881,11 +842,9 @@ class CyphtPipeline
 		// ---- Step 2/3: config_gen.php ----
 		$emit("\n== Step 2/3: php scripts/config_gen.php ==\n");
 
-		/* Offline builds arrive here with no envConfig and a .env already
-		 * holding the build defaults, which is all config_gen.php reads. Only
-		 * a Dolibarr-backed build can write the installation half, so skip
-		 * rather than fail: the alternative is refusing to compile at all
-		 * without a database. */
+		/* Offline builds arrive with no envConfig and a .env already holding
+		 * the build defaults, which is all config_gen.php reads. Skipping
+		 * beats refusing to compile without a database. */
 		if ($this->envConfig !== null) {
 			if (!$this->envConfig->writeEnvFile($this->envConfig->buildEnvOverrides())) {
 				$this->error = $this->envConfig->error;
@@ -960,10 +919,8 @@ class CyphtPipeline
 		 * only record a shipped release carries of what went into it. */
 		$this->writeBuildInfo($version);
 
-		/* Recording what was built is a Dolibarr bookkeeping step, not part of
-		 * compiling, so an offline build simply skips it. There is no llx_const
-		 * to write to and no $conf->entity to scope it by; the setup page reads
-		 * these back only where Dolibarr exists. */
+		/* Bookkeeping, not compiling: an offline build has no llx_const to
+		 * write to and no $conf->entity to scope it by. */
 		if ($this->db !== null) {
 			global $conf;
 

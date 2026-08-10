@@ -55,14 +55,9 @@ class CyphtEnvironment
 	/**
 	 * The half of the .env that owes nothing to Dolibarr.
 	 *
-	 * Static, and deliberately separate from buildEnvOverrides(): the module
-	 * can be compiled with no Dolibarr present at all, and config_gen.php
-	 * needs CYPHT_MODULES to know which module sets to scan. Keeping one
-	 * definition means the offline build and the Dolibarr build cannot drift
-	 * into compiling different module lists.
-	 *
-	 * Nothing here is a secret or an installation detail, so a build carrying
-	 * only these values is safe to distribute.
+	 * Static so an offline build can reach it, and shared with
+	 * buildEnvOverrides() so the two build paths cannot compile different
+	 * module lists. Contains no secrets, so it is safe to distribute.
 	 *
 	 * @return array<string,string>
 	 */
@@ -79,14 +74,9 @@ class CyphtEnvironment
 			'ENABLE_MEMCACHED' => 'false',
 			'ENABLE_DEBUG'     => 'false',
 			'DEFAULT_LANGUAGE' => 'en',
-			// "account" is where users add their IMAP mailbox after SSO.
-			// "api_login" is what performSsoLogin() calls. "themes" serves
-			// the Bootswatch CSS packs; without it the app renders unstyled.
-			// dolibarr_contacts must appear here or config_gen.php never scans
-			// its setup.php, and it must follow "contacts", whose load_contacts
-			// handler it attaches to. dolibarr_mail_templates has the same
-			// scanning requirement but attaches to core's load_user_data, so
-			// its only ordering constraint is that it follow "core".
+			// Order matters: dolibarr_contacts must follow "contacts", whose
+			// load_contacts handler it attaches to. Omitting a module set here
+			// means config_gen.php never scans its setup.php.
 			'CYPHT_MODULES'    => 'core,contacts,dolibarr_contacts,dolibarr_mail_templates,imap,smtp,api_login,account,nux,developer,history,saved_searches,advanced_search,profiles,inline_message,imap_folders,keyboard_shortcuts,site,dynamic_login,sievefilters,themes',
 			'DISABLE_FINGERPRINT' => 'true',
 			'DISABLE_EMPTY_SUPERGLOBALS' => 'true',
@@ -95,14 +85,9 @@ class CyphtEnvironment
 	}
 
 	/**
-	 * Build the list of .env overrides derived from Dolibarr's own config
-	 * (llx_const, set via the admin/setup.php form) plus the build time
-	 * defaults above.
-	 *
-	 * Everything this adds on top of buildTimeDefaults() is per installation:
-	 * database credentials, generated secrets, absolute data paths and the
-	 * bridge URLs. None of it can be known when the module is compiled, which
-	 * is why activation writes it rather than the build.
+	 * buildTimeDefaults() plus everything that is per installation: database
+	 * credentials, generated secrets, data paths and bridge URLs. None of it
+	 * is knowable at compile time.
 	 *
 	 * @return array<string,string>
 	 */
@@ -112,9 +97,7 @@ class CyphtEnvironment
 
 		$dataDir = $this->paths->getDataDir();
 
-		// Cypht stores per-user settings in Dolibarr's own database. Taken from
-		// $conf->db, which is already decrypted when the password is encrypted
-		// in conf.php.
+		// $conf->db is already decrypted, even when conf.php encrypts it.
 		$dbType = (isset($conf->db->type) && $conf->db->type === 'pgsql') ? 'pgsql' : 'mysql';
 
 		return array_merge(self::buildTimeDefaults(), array(
@@ -175,11 +158,9 @@ class CyphtEnvironment
 	/**
 	 * The same write, without needing an instance.
 	 *
-	 * An offline build has no Dolibarr, so no database handle and no token
-	 * store, and therefore cannot construct this class. It still has to put
-	 * CYPHT_MODULES in front of config_gen.php. This entry point takes the
-	 * path directly so the build can write the constants half on its own, and
-	 * activation later merges the installation half over the top.
+	 * An offline build has no database handle or token store, so it cannot
+	 * construct this class, but still has to put CYPHT_MODULES in front of
+	 * config_gen.php. Activation merges the installation half over the top.
 	 *
 	 * @param string $cyphtPath Cypht root inside vendor/
 	 * @param array<string,string> $overrides Key/value pairs to force
