@@ -320,12 +320,50 @@ if ($masterIncPath === '') {
 	}
 }
 
+/*
+ * No Dolibarr is no longer fatal. config_gen.php reads only CYPHT_MODULES
+ * from the .env and never opens the database, and the one absolute path it
+ * bakes into the entry point is rewritten at publish time. So the app can be
+ * compiled here, in a bare clone, and the result is portable.
+ *
+ * What cannot be produced offline is the installation half of the .env:
+ * database credentials, the generated secrets, the data directory and the
+ * bridge URLs. Those are written when the module is activated in Dolibarr,
+ * and rewritten whenever its setup page is saved.
+ */
 if ($masterIncPath === '') {
-	fwrite(STDERR, "Could not find Dolibarr's master.inc.php from ".$root."\n");
-	fwrite(STDERR, "Point at it with --dolibarr=/path/to/htdocs if this module sits\n");
-	fwrite(STDERR, "outside the Dolibarr tree, or use --prepare to build everything\n");
-	fwrite(STDERR, "that does not need Dolibarr.\n");
-	exit(1);
+	cyphtSay("\n== Offline build ==\n", $options['quiet']);
+	cyphtSay("No Dolibarr found, compiling with build defaults only.\n", $options['quiet']);
+
+	require_once $root.'/class/install/environment.class.php';
+	require_once $root.'/class/install/pipeline.class.php';
+
+	$envError = '';
+	if (!CyphtEnvironment::writeEnvTo($paths->getCyphtPath(), CyphtEnvironment::buildTimeDefaults(), $envError)) {
+		fwrite(STDERR, $envError."\n");
+		exit(1);
+	}
+	cyphtSay("wrote build defaults to vendor/jason-munro/cypht/.env\n", $options['quiet']);
+
+	// Nulls for the Dolibarr-bound dependencies; the compile half never reads them.
+	$offline = new CyphtPipeline(null, $paths, null, $vendorLayout, null, $patches, $installer);
+
+	/* runConfigGen() is the whole three step pipeline, composer then
+	 * config_gen then publish, so there is no separate publish call here. It
+	 * re-runs composer over the tree step 1 already installed, which is a
+	 * no-op in practice. */
+	$genResult = $offline->runConfigGen(function ($chunk) use ($options) {
+		cyphtSay($chunk, $options['quiet']);
+	});
+	if (empty($genResult['success'])) {
+		fwrite(STDERR, "\n".(isset($genResult['error']) ? $genResult['error'] : 'config_gen failed')."\n");
+		exit(1);
+	}
+
+	cyphtSay("\nBuilt. public/ is compiled and carries no machine specific path.\n", $options['quiet']);
+	cyphtSay("Database credentials, secrets and bridge URLs are written when the\n", $options['quiet']);
+	cyphtSay("module is activated in Dolibarr, or when its setup page is saved.\n", $options['quiet']);
+	exit(0);
 }
 
 require_once $masterIncPath;

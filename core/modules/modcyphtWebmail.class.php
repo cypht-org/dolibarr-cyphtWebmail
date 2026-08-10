@@ -636,6 +636,20 @@ class modcyphtWebmail extends DolibarrModules
 			return -1; // Do not activate module if error 'not allowed' returned when loading module SQL queries (the _load_table run sql with run_sql with the error allowed parameter set to 'default')
 		}
 
+		/* Everything this installation needs that a shipped build cannot
+		 * carry. It used to be produced as a side effect of building on the
+		 * target machine; a prebuilt module never builds here, so activation
+		 * has to do it instead.
+		 *
+		 * Nothing is written to the module directory. The secrets go to
+		 * llx_const and the data directories live under DOL_DATA_ROOT, which
+		 * is outside the web root and writable by the webserver. That is the
+		 * whole point: an installed module should never need write access to
+		 * its own folder. */
+		if ($this->provisionInstallation() < 0) {
+			return -1;
+		}
+
 		// Create extrafields during init
 		//include_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
 		//$extrafields = new ExtraFields($this->db);
@@ -697,5 +711,49 @@ class modcyphtWebmail extends DolibarrModules
 	{
 		$sql = array();
 		return $this->_remove($sql, $options);
+	}
+
+	/**
+	 * Create the per-installation state a distributed build cannot contain.
+	 *
+	 * Three secrets and two directories. The secrets are minted once and kept
+	 * in llx_const, so re-activating an existing installation is harmless:
+	 * each getOrCreate* returns what is already there rather than rolling a
+	 * new value, which matters because changing USER_CONFIG_SECRET would
+	 * orphan every stored mailbox password.
+	 *
+	 * Read back at runtime by CyphtEnvBootstrap, which is why none of it is
+	 * written to a file.
+	 *
+	 * @return int<-1,1> 1 on success, -1 on failure
+	 */
+	private function provisionInstallation()
+	{
+		global $conf, $langs;
+
+		require_once __DIR__ . '/../../class/install/paths.class.php';
+		require_once __DIR__ . '/../../class/auth/token.class.php';
+
+		try {
+			$token = new CyphtToken($this->db);
+
+			// SSO assertions, encryption of stored mailbox passwords, and
+			// Cypht's own per-site fingerprint input.
+			$token->getOrCreateSsoSecret();
+			$token->getOrCreateConfigSecret();
+			$token->getOrCreateSiteId();
+
+			// Cypht writes user settings and in-progress attachments here.
+			// getDataDir() creates both subdirectories.
+			$paths = new CyphtPaths();
+			$paths->getDataDir();
+		} catch (Exception $e) {
+			$langs->load("errors");
+			$this->error = 'CyphtWebmail could not provision this installation: ' . $e->getMessage();
+
+			return -1;
+		}
+
+		return 1;
 	}
 }

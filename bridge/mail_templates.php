@@ -107,7 +107,11 @@ if ($login === '' || $token === '') {
 
 // ---------------------------------------------------------------------
 
-$secret = getDolGlobalString('CYPHTWEBMAIL_SSO_SECRET', '');
+require_once __DIR__.'/../class/install/config.class.php';
+// Not llx_const: dolibarr_set_const() encrypts anything whose name ends
+// in _SECRET, and the webmail reads its copy over raw PDO before
+// Dolibarr is loaded, so the two ends would sign with different values.
+$secret = CyphtConfig::get($db, 'SSO_SHARED_SECRET', '');
 if ($secret === '') {
 	cyphtMailTemplatesRespond(503, array('error' => 'SSO secret not initialised, run the module build first'));
 }

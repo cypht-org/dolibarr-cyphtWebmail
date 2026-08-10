@@ -53,10 +53,56 @@ class CyphtEnvironment
 	}
 
 	/**
+	 * The half of the .env that owes nothing to Dolibarr.
+	 *
+	 * Static, and deliberately separate from buildEnvOverrides(): the module
+	 * can be compiled with no Dolibarr present at all, and config_gen.php
+	 * needs CYPHT_MODULES to know which module sets to scan. Keeping one
+	 * definition means the offline build and the Dolibarr build cannot drift
+	 * into compiling different module lists.
+	 *
+	 * Nothing here is a secret or an installation detail, so a build carrying
+	 * only these values is safe to distribute.
+	 *
+	 * @return array<string,string>
+	 */
+	public static function buildTimeDefaults()
+	{
+		return array(
+			'DB_CONNECTION_TYPE' => 'host',
+			'SESSION_TYPE'     => 'custom',
+			'AUTH_TYPE'        => 'custom',
+			// Not 'file': Hm_User_Config_File keys its encryption on the login
+			// password, which under SSO is a fresh token every request.
+			'USER_CONFIG_TYPE' => 'custom:Custom_User_Config',
+			'ENABLE_REDIS'     => 'false',
+			'ENABLE_MEMCACHED' => 'false',
+			'ENABLE_DEBUG'     => 'false',
+			'DEFAULT_LANGUAGE' => 'en',
+			// "account" is where users add their IMAP mailbox after SSO.
+			// "api_login" is what performSsoLogin() calls. "themes" serves
+			// the Bootswatch CSS packs; without it the app renders unstyled.
+			// dolibarr_contacts must appear here or config_gen.php never scans
+			// its setup.php, and it must follow "contacts", whose load_contacts
+			// handler it attaches to. dolibarr_mail_templates has the same
+			// scanning requirement but attaches to core's load_user_data, so
+			// its only ordering constraint is that it follow "core".
+			'CYPHT_MODULES'    => 'core,contacts,dolibarr_contacts,dolibarr_mail_templates,imap,smtp,api_login,account,nux,developer,history,saved_searches,advanced_search,profiles,inline_message,imap_folders,keyboard_shortcuts,site,dynamic_login,sievefilters,themes',
+			'DISABLE_FINGERPRINT' => 'true',
+			'DISABLE_EMPTY_SUPERGLOBALS' => 'true',
+			'DISABLE_OPEN_BASE_DIR' => 'true',
+		);
+	}
+
+	/**
 	 * Build the list of .env overrides derived from Dolibarr's own config
-	 * (llx_const, set via the admin/setup.php form) plus fixed defaults
-	 * that make sense for running inside Dolibarr (no separate Cypht DB,
-	 * no Redis/Memcached assumed present).
+	 * (llx_const, set via the admin/setup.php form) plus the build time
+	 * defaults above.
+	 *
+	 * Everything this adds on top of buildTimeDefaults() is per installation:
+	 * database credentials, generated secrets, absolute data paths and the
+	 * bridge URLs. None of it can be known when the module is compiled, which
+	 * is why activation writes it rather than the build.
 	 *
 	 * @return array<string,string>
 	 */
@@ -71,8 +117,7 @@ class CyphtEnvironment
 		// in conf.php.
 		$dbType = (isset($conf->db->type) && $conf->db->type === 'pgsql') ? 'pgsql' : 'mysql';
 
-		return array(
-			'DB_CONNECTION_TYPE' => 'host',
+		return array_merge(self::buildTimeDefaults(), array(
 			'DB_DRIVER'          => $dbType,
 			'DB_HOST'            => (isset($conf->db->host) ? $conf->db->host : '127.0.0.1'),
 			'DB_PORT'            => (isset($conf->db->port) ? $conf->db->port : ''),
@@ -81,39 +126,18 @@ class CyphtEnvironment
 			'DB_PASS'            => (isset($conf->db->pass) ? $conf->db->pass : ''),
 			// Configurable in conf.php, so never assumed to be llx_.
 			'DOLIBARR_DB_PREFIX' => (defined('MAIN_DB_PREFIX') ? MAIN_DB_PREFIX : 'llx_'),
-			'SESSION_TYPE'     => 'custom',
-			'AUTH_TYPE'        => 'custom',
 			'IMAP_AUTH_NAME'   => getDolGlobalString('CYPHTWEBMAIL_IMAP_NAME', 'Webmail'),
 			'IMAP_AUTH_SERVER' => getDolGlobalString('CYPHTWEBMAIL_IMAP_SERVER', 'localhost'),
 			'IMAP_AUTH_PORT'   => getDolGlobalString('CYPHTWEBMAIL_IMAP_PORT', '993'),
 			'IMAP_AUTH_TLS'    => getDolGlobalString('CYPHTWEBMAIL_IMAP_TLS', 'true'),
-			// Not 'file': Hm_User_Config_File keys its encryption on the login
-			// password, which under SSO is a fresh token every request.
-			'USER_CONFIG_TYPE' => 'custom:Custom_User_Config',
 			'USER_SETTINGS_DIR' => $dataDir . '/users',
 			'ATTACHMENT_DIR'   => $dataDir . '/attachments',
-			'ENABLE_REDIS'     => 'false',
-			'ENABLE_MEMCACHED' => 'false',
-			'ENABLE_DEBUG'     => 'false',
-			'DEFAULT_LANGUAGE' => 'en',
-			// "account" is where users add their IMAP mailbox after SSO.
-			// "api_login" is what performSsoLogin() calls. "themes" serves
-			// the Bootswatch CSS packs; without it the app renders unstyled.
-			// dolibarr_contacts must appear here or config_gen.php never scans
-			// its setup.php, and it must follow "contacts", whose load_contacts
-			// handler it attaches to. dolibarr_mail_templates has the same scanning
-			// requirement but attaches to core's load_user_data, so its only
-			// ordering constraint is that it follow "core".
-			'CYPHT_MODULES'    => 'core,contacts,dolibarr_contacts,dolibarr_mail_templates,imap,smtp,api_login,account,nux,developer,history,saved_searches,advanced_search,profiles,inline_message,imap_folders,keyboard_shortcuts,site,dynamic_login,sievefilters,themes',
-			'DISABLE_FINGERPRINT' => 'true',
-			'DISABLE_EMPTY_SUPERGLOBALS' => 'true',
 			'SSO_SHARED_SECRET' => $this->token->getOrCreateSsoSecret(),
 			// Encrypts the mailbox passwords inside the stored config.
 			'USER_CONFIG_SECRET' => $this->token->getOrCreateConfigSecret(),
 			'SESSION_DEBUG'      => getDolGlobalString('CYPHTWEBMAIL_SESSION_DEBUG', 'false'),
 			'SESSION_TTL'        => getDolGlobalString('CYPHTWEBMAIL_SESSION_TTL', '604800'),
 			'SESSION_GC_DIVISOR' => getDolGlobalString('CYPHTWEBMAIL_SESSION_GC_DIVISOR', '200'),
-			'DISABLE_OPEN_BASE_DIR' => 'true',
 			'DOLIBARR_CONTACTS_URL' => CyphtContactSource::resolveBridgeUrl(),
 			'DOLIBARR_CONTACTS_TTL' => getDolGlobalString('CYPHTWEBMAIL_CONTACTS_TTL', '300'),
 			'DOLIBARR_CONTACTS_TIMEOUT' => getDolGlobalString('CYPHTWEBMAIL_CONTACTS_TIMEOUT', '5'),
@@ -126,7 +150,7 @@ class CyphtEnvironment
 			'DOLIBARR_MAIL_TEMPLATES_INSECURE' => getDolGlobalString('CYPHTWEBMAIL_MAIL_TEMPLATES_INSECURE', 'false'),
 			// Opened with target="_top" so it escapes the webmail iframe.
 			'DOLIBARR_NEW_CONTACT_URL' => dol_buildpath('/contact/card.php', 2) . '?action=create',
-		);
+		));
 	}
 
 	/**
@@ -139,18 +163,42 @@ class CyphtEnvironment
 	 */
 	public function writeEnvFile(array $overrides)
 	{
-		$cyphtPath = $this->paths->getCyphtPath();
+		$error = '';
+		if (!self::writeEnvTo($this->paths->getCyphtPath(), $overrides, $error)) {
+			$this->error = $error;
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * The same write, without needing an instance.
+	 *
+	 * An offline build has no Dolibarr, so no database handle and no token
+	 * store, and therefore cannot construct this class. It still has to put
+	 * CYPHT_MODULES in front of config_gen.php. This entry point takes the
+	 * path directly so the build can write the constants half on its own, and
+	 * activation later merges the installation half over the top.
+	 *
+	 * @param string $cyphtPath Cypht root inside vendor/
+	 * @param array<string,string> $overrides Key/value pairs to force
+	 * @param string $error Set on failure
+	 * @return bool
+	 */
+	public static function writeEnvTo($cyphtPath, array $overrides, &$error = '')
+	{
 		$envFile = $cyphtPath . '/.env';
 		$source = file_exists($envFile) ? $envFile : $cyphtPath . '/.env.example';
 
 		if (!file_exists($source)) {
-			$this->error = 'Neither .env nor .env.example found in ' . $cyphtPath . '. Is Cypht actually installed under vendor/?';
+			$error = 'Neither .env nor .env.example found in ' . $cyphtPath . '. Is Cypht actually installed under vendor/?';
 			return false;
 		}
 
 		$lines = file($source, FILE_IGNORE_NEW_LINES);
 		if ($lines === false) {
-			$this->error = 'Could not read ' . $source;
+			$error = 'Could not read ' . $source;
 			return false;
 		}
 
@@ -172,7 +220,7 @@ class CyphtEnvironment
 
 		$result = file_put_contents($envFile, implode("\n", $lines) . "\n");
 		if ($result === false) {
-			$this->error = 'Could not write ' . $envFile . ' (permissions?)';
+			$error = 'Could not write ' . $envFile . ' (permissions?)';
 			return false;
 		}
 

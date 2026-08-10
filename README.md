@@ -15,7 +15,7 @@ Cypht is LGPL-2.1, Dolibarr is GPL-3.0. This module is GPL-3.0.
 - [What it does](#what-it-does)
 - [Requirements](#requirements)
 - [Installation](#installation)
-- [Setup and first build](#setup-and-first-build)
+- [Setup](#setup)
 - [Daily use](#daily-use)
 - [Where data is stored](#where-data-is-stored)
 - [Configuration reference](#configuration-reference)
@@ -75,9 +75,9 @@ If the module is not in the tree below Dolibarr, `scripts/build.php` cannot find
 it on its own; pass `--dolibarr=/path/to/htdocs`. See
 [Building from the command line](#building-from-the-command-line).
 
-If you received the module as an archive it may already contain `vendor/`. If it
-also contains `public/`, it was packaged wrongly; see
-[Build where it will run](#build-where-it-will-run).
+A release archive contains `vendor/` and a compiled `public/` already. That is
+what makes it installable without a toolchain; see
+[Packaging a release](#packaging-a-release).
 
 ### 2. Enable the module
 
@@ -87,23 +87,23 @@ switch it on.
 Enabling creates the database tables, registers the triggers and adds the menu
 entries. The build does none of that, so this step cannot be skipped.
 
-### 3. Build it
+That is the whole installation. Releases ship already compiled, so there is no
+Composer step, no command line, and nothing to build.
 
-Cypht ships as source and has to be compiled before it will run. From a
-terminal, on the machine that will serve it:
+### If you installed from git instead
+
+A clone gives you source rather than a release, so it does have to be compiled
+once:
 
 ```bash
 cd <module directory>
 php scripts/build.php
 ```
 
-Or press **Generate** on the setup page. Either route pulls the Composer
-dependencies too, so there is no separate `composer install` step.
+This needs a PHP CLI binary and either Composer or a prepared `vendor/`. It is
+the same command the release process runs, and it does not need Dolibarr.
 
-[Setup and first build](#setup-and-first-build) covers what the build does and
-when to run it again.
-
-## Setup and first build
+## Setup
 
 ### The setup page
 
@@ -113,11 +113,13 @@ when to run it again.
 /custom/cyphtWebmail/admin/setup.php
 ```
 
-This is where everything is configured and built. It has:
+This is where everything is configured. It has:
 
 - **IMAP defaults** - name, server, port, TLS for the default account form
-- **Generate** - the build button (see below)
-- **Build log** - streamed live, and kept after a page reload
+- **Cypht build status** - installed and built versions, last build date
+- **Maintenance** - the Generate button and its log, shown only when Dolibarr
+  is not in production mode. Releases ship compiled, so an ordinary
+  installation never sees it. Set `CYPHTWEBMAIL_ENABLE_BUILD` to force it on
 
 ### Press Generate
 
@@ -157,31 +159,33 @@ button.
 Run it as the webserver user, or pass `--owner`. A build run as yourself leaves
 files the webserver cannot write, and that fails later, far from the cause.
 
-### Build where it will run
+### Packaging a release
 
-A compiled build belongs to the machine that made it. `config_gen.php` writes
-absolute paths into `public/index.php` and `config/dynamic.php`, so a build
-copied to another machine, or to a different path on the same one, will not
-start.
+A compiled build is portable. `config_gen.php` bakes the build machine's own
+directory into `public/index.php`, so the publish step rewrites that one
+`define()` to locate itself instead, and `config/dynamic.php` contains no paths
+at all. Nothing else in the build output names the machine that produced it.
 
-**Never distribute a folder that has been fully built.** A completed build
-leaves `vendor/jason-munro/cypht/.env` behind, holding the database credentials
-and `CYPHTWEBMAIL_CONFIG_SECRET`, the key that decrypts every user's stored
-mailbox passwords. `.gitignore` keeps `vendor/` and `public/` out of git, but a
-zip or a `cp -r` does not read `.gitignore`.
-
-To package the module, stop before anything is compiled:
+Build the release from a bare clone, with no Dolibarr present:
 
 ```bash
-php scripts/build.php --prepare      # then zip
+php scripts/build.php      # then zip the tree
 ```
 
-`--prepare` ends before `.env` and `public/` exist, so the archive carries
-`vendor/` and the Cypht module sets and nothing sensitive. Whoever unpacks it
-runs a normal build, needing neither Composer nor network access.
+Name the archive `cyphtwebmail-x.y.z.zip`, with the module directory at the
+root, so Dolibarr's *Deploy external module* screen accepts it. The version has
+to be the last thing before `.zip` or the upload is rejected.
 
-If you already zipped a built tree, delete `vendor/jason-munro/cypht/.env` and
-`public/` from the archive before it goes anywhere.
+**Check what the archive contains before publishing it.** The `.env` inside a
+release must hold only the build defaults, roughly a dozen keys that are the
+same on every installation. It must never carry `DB_PASS`,
+`SSO_SHARED_SECRET` or `USER_CONFIG_SECRET`: those belong to an installation,
+not to a build, and the second of them decrypts every stored mailbox password.
+An offline build writes only the defaults, but a tree that has also been built
+against a live Dolibarr will have the rest sitting in the same file.
+
+`.gitignore` keeps `vendor/` and `public/` out of git, and a zip does not read
+`.gitignore`, so the check is worth doing by hand.
 
 ### Reactivate after descriptor changes
 

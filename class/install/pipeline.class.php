@@ -81,12 +81,20 @@ class CyphtPipeline
 	 * @param CyphtUpstreamPatches $upstreamPatcher
 	 * @param CyphtModuleInstaller $moduleInstaller
 	 */
+	/**
+	 * $db, $envConfig and $login are nullable because the compile half of this
+	 * class does not use them: runConfigGen() touches no member at all, and
+	 * publishSite() only needs $paths and $vendorBridge. That lets an offline
+	 * build, which has no Dolibarr and therefore no database handle, token
+	 * store or login helper, still drive a real compile. Anything that does
+	 * need them is guarded by requireDolibarr().
+	 */
 	public function __construct(
 		$db,
 		CyphtPaths $paths,
-		CyphtEnvironment $envConfig,
+		?CyphtEnvironment $envConfig,
 		CyphtVendorLayout $vendorBridge,
-		CyphtLogin $login,
+		?CyphtLogin $login,
 		CyphtUpstreamPatches $upstreamPatcher,
 		CyphtModuleInstaller $moduleInstaller
 	) {
@@ -561,7 +569,93 @@ class CyphtPipeline
 
 		$this->vendorBridge->copyRecursive($sitePath, $publicPath);
 
-		return file_exists($publicPath . '/index.php');
+		if (!file_exists($publicPath . '/index.php')) {
+			$this->error = 'Publish copied no index.php into ' . $publicPath;
+			return false;
+		}
+
+		return $this->makeIndexRelocatable($publicPath . '/index.php');
+	}
+
+	/**
+	 * Replace the one absolute path in the published entry point with an
+	 * expression that resolves itself.
+	 *
+	 * config_gen.php bakes the build machine's own directory into the entry
+	 * point (scripts/config_gen.php:658 substitutes APP_PATH into a template
+	 * that ships empty). That single define is the only thing in the whole
+	 * build output tied to where it was built: config/dynamic.php, all 12k
+	 * lines of it, contains no paths at all. So rewriting this one line is
+	 * what makes a compiled build portable, and therefore shippable.
+	 *
+	 * public/ always sits directly under the module root, so dirname(__DIR__)
+	 * is the module root wherever it has been installed.
+	 *
+	 * @param string $indexFile Published public/index.php
+	 * @return bool
+	 */
+	private function makeIndexRelocatable($indexFile)
+	{
+		$content = file_get_contents($indexFile);
+		if ($content === false) {
+			$this->error = 'Could not read ' . $indexFile;
+			return false;
+		}
+
+		/* 1. Self-locating APP_PATH.
+		 *
+		 * Matched on the define rather than on the path itself: the baked
+		 * value carries the build host's separators, which differ between
+		 * Windows and POSIX, and would otherwise need escaping to match. */
+		$content = preg_replace(
+			"/define\(\s*'APP_PATH'\s*,\s*'[^']*'\s*\);/",
+			"define('APP_PATH', dirname(__DIR__).'/vendor/jason-munro/cypht/');"
+				. "\n\nrequire_once dirname(__DIR__).'/class/runtime/envbootstrap.class.php';"
+				. "\n\$cyphtEnvBootstrap = new CyphtEnvBootstrap(dirname(__DIR__));"
+				. "\n\$cyphtEnvBootstrap->apply();",
+			$content,
+			1,
+			$countPath
+		);
+
+		if ($content === null || $countPath !== 1) {
+			/* Upstream changed the shape of the define. Failing loudly beats
+			 * publishing a build that only runs on this machine. */
+			$this->error = 'Could not rewrite APP_PATH in ' . $indexFile .
+				' (matched ' . (int) $countPath . ' times). Cypht\'s entry point template may have changed.';
+			return false;
+		}
+
+		/* 2. Per-installation SITE_ID.
+		 *
+		 * The bootstrap above has already populated $_ENV, which is why it is
+		 * injected before this define rather than after: SITE_ID is fixed near
+		 * the top of the entry point, long before Cypht loads its own config.
+		 *
+		 * The compiled literal stays as the fallback. It is shared across
+		 * installations and therefore not what we want, but a Cypht that
+		 * starts with a weak site id beats one that will not start at all
+		 * because the database was briefly unreachable. */
+		$content = preg_replace(
+			"/define\(\s*'SITE_ID'\s*,\s*'([^']*)'\s*\);/",
+			"define('SITE_ID', (isset(\$_ENV['CYPHT_SITE_ID']) && \$_ENV['CYPHT_SITE_ID'] !== '') ? \$_ENV['CYPHT_SITE_ID'] : '$1');",
+			$content,
+			1,
+			$countSite
+		);
+
+		if ($content === null || $countSite !== 1) {
+			$this->error = 'Could not rewrite SITE_ID in ' . $indexFile .
+				' (matched ' . (int) $countSite . ' times).';
+			return false;
+		}
+
+		if (file_put_contents($indexFile, $content) === false) {
+			$this->error = 'Could not write ' . $indexFile;
+			return false;
+		}
+
+		return true;
 	}
 
 	/**
@@ -740,10 +834,19 @@ class CyphtPipeline
 		// ---- Step 2/3: config_gen.php ----
 		$emit("\n== Step 2/3: php scripts/config_gen.php ==\n");
 
-		if (!$this->envConfig->writeEnvFile($this->envConfig->buildEnvOverrides())) {
-			$this->error = $this->envConfig->error;
-			$emit($this->error . "\n", 'err');
-			return array('success' => false, 'output' => $log, 'error' => $this->error);
+		/* Offline builds arrive here with no envConfig and a .env already
+		 * holding the build defaults, which is all config_gen.php reads. Only
+		 * a Dolibarr-backed build can write the installation half, so skip
+		 * rather than fail: the alternative is refusing to compile at all
+		 * without a database. */
+		if ($this->envConfig !== null) {
+			if (!$this->envConfig->writeEnvFile($this->envConfig->buildEnvOverrides())) {
+				$this->error = $this->envConfig->error;
+				$emit($this->error . "\n", 'err');
+				return array('success' => false, 'output' => $log, 'error' => $this->error);
+			}
+		} else {
+			$emit("no Dolibarr: keeping the build defaults already in .env\n");
 		}
 
 		if (!$this->vendorBridge->ensureCyphtVendorBridge()) {
@@ -804,14 +907,23 @@ class CyphtPipeline
 		}
 		$emit(sprintf("[copy finished in %.1fs]\n", microtime(true) - $stepStart));
 
-		// main.inc.php pulls admin.lib.php in for us; master.inc.php, which is
-		// all a command line build loads, does not. Ask for it here so the
-		// build does not die on the last line after doing all the work.
-		require_once DOL_DOCUMENT_ROOT . '/core/lib/admin.lib.php';
-
 		$version = $this->paths->getInstalledVersion();
-		dolibarr_set_const($this->db, 'CYPHTWEBMAIL_LAST_BUILD', dol_now(), 'chaine', 0, '', $conf->entity);
-		dolibarr_set_const($this->db, 'CYPHTWEBMAIL_BUILT_VERSION', $version, 'chaine', 0, '', $conf->entity);
+
+		/* Recording what was built is a Dolibarr bookkeeping step, not part of
+		 * compiling, so an offline build simply skips it. There is no llx_const
+		 * to write to and no $conf->entity to scope it by; the setup page reads
+		 * these back only where Dolibarr exists. */
+		if ($this->db !== null) {
+			global $conf;
+
+			// main.inc.php pulls admin.lib.php in for us; master.inc.php, which
+			// is all a command line build loads, does not. Ask for it here so
+			// the build does not die on the last line after doing all the work.
+			require_once DOL_DOCUMENT_ROOT . '/core/lib/admin.lib.php';
+
+			dolibarr_set_const($this->db, 'CYPHTWEBMAIL_LAST_BUILD', dol_now(), 'chaine', 0, '', $conf->entity);
+			dolibarr_set_const($this->db, 'CYPHTWEBMAIL_BUILT_VERSION', $version, 'chaine', 0, '', $conf->entity);
+		}
 
 		$emit("Published to " . $this->paths->getPublicPath() . "\nBuild complete. Cypht " . $version . " is live.\n");
 

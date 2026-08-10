@@ -79,3 +79,9 @@ CyphtMenuModuleSetup=Module setup
 CyphtWebmailCannotBuildHere=This server cannot build from the browser.
 CyphtWebmailBuildFromShell=Run the build from a terminal instead:
 CyphtWebmailRebuildFromShell=Cypht is built and running. This server cannot rebuild it from the browser; to rebuild, run this from the module folder:
+
+# Maintenance section on the setup page. The build controls only appear in
+# developer mode: releases ship precompiled, so an ordinary installation never
+# compiles anything.
+CyphtWebmailMaintenance = Maintenance
+CyphtWebmailMaintenanceHint = Developer tools. Releases ship already compiled, so rebuilding is only needed after changing anything under cypht/modules/.

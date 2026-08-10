@@ -23,6 +23,8 @@ require_once __DIR__ . '/../install/paths.class.php';
  * \brief       Shared secrets and the short-lived HMAC assertions that prove
  *              a request belongs to a given Dolibarr user.
  */
+require_once __DIR__ . '/../install/config.class.php';
+
 class CyphtToken
 {
 	/**
@@ -54,7 +56,7 @@ class CyphtToken
 	{
 		global $conf;
 
-		$secret = getDolGlobalString('CYPHTWEBMAIL_SSO_SECRET', '');
+		$secret = CyphtConfig::get($this->db, 'SSO_SHARED_SECRET', '');
 		if ($secret !== '') {
 			return $secret;
 		}
@@ -64,7 +66,7 @@ class CyphtToken
 		require_once DOL_DOCUMENT_ROOT . '/core/lib/admin.lib.php';
 
 		$secret = bin2hex(random_bytes(32));
-		dolibarr_set_const($this->db, 'CYPHTWEBMAIL_SSO_SECRET', $secret, 'chaine', 0, '', $conf->entity);
+		CyphtConfig::set($this->db, 'SSO_SHARED_SECRET', $secret);
 
 		return $secret;
 	}
@@ -83,7 +85,7 @@ class CyphtToken
 	{
 		global $conf;
 
-		$secret = getDolGlobalString('CYPHTWEBMAIL_CONFIG_SECRET', '');
+		$secret = CyphtConfig::get($this->db, 'USER_CONFIG_SECRET', '');
 		if ($secret !== '') {
 			return $secret;
 		}
@@ -91,9 +93,40 @@ class CyphtToken
 		require_once DOL_DOCUMENT_ROOT . '/core/lib/admin.lib.php';
 
 		$secret = bin2hex(random_bytes(32));
-		dolibarr_set_const($this->db, 'CYPHTWEBMAIL_CONFIG_SECRET', $secret, 'chaine', 0, '', $conf->entity);
+		CyphtConfig::set($this->db, 'USER_CONFIG_SECRET', $secret);
 
 		return $secret;
+	}
+
+	/**
+	 * Cypht's per-site identifier.
+	 *
+	 * Cypht's own build bakes this into the compiled entry point as a literal,
+	 * which is fine when every installation compiles for itself and wrong the
+	 * moment a build is shipped: every install would share one value.
+	 * Hm_Crypt feeds SITE_ID into build_fingerprint() alongside the username
+	 * and request key (lib/crypt.php), so a shared value is a shared input to
+	 * request key derivation, not a cosmetic id.
+	 *
+	 * Generated here like the other two and read back at runtime, so a
+	 * distributed build stays distributable and each install still gets its
+	 * own.
+	 *
+	 * @return string
+	 */
+	public function getOrCreateSiteId()
+	{
+		global $conf;
+
+		$siteId = CyphtConfig::get($this->db, 'CYPHT_SITE_ID', '');
+		if ($siteId !== '') {
+			return $siteId;
+		}
+
+		$siteId = bin2hex(random_bytes(32));
+		CyphtConfig::set($this->db, 'CYPHT_SITE_ID', $siteId);
+
+		return $siteId;
 	}
 
 	/**
