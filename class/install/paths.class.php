@@ -102,6 +102,27 @@ class CyphtPaths
 	}
 
 	/**
+	 * What the build recorded about itself, or null when there is no record.
+	 *
+	 * A shipped release has no llx_const behind it, so CYPHTWEBMAIL_BUILT_VERSION
+	 * is empty on every prebuilt install and cannot answer "what is this".
+	 * build.json is written by the build itself and travels with it.
+	 *
+	 * @return array<string,string>|null Keys: module_version, cypht_version, built_at
+	 */
+	public function getBuildInfo()
+	{
+		$file = $this->getModuleRoot() . '/build.json';
+		if (!is_readable($file)) {
+			return null;
+		}
+
+		$data = json_decode((string) file_get_contents($file), true);
+
+		return is_array($data) ? $data : null;
+	}
+
+	/**
 	 * Read jason-munro/cypht's installed version straight from Composer's
 	 * own installed.json, so this always reflects whatever is actually on
 	 * disk (post composer update) rather than something we cached earlier.
