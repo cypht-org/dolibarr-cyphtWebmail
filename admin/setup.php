@@ -153,13 +153,28 @@ print '</td></tr>';
 
 print '</table>';
 
-// Three cases: this server can build, it cannot and nothing is built yet, or
-// it cannot but a build is already live (done from a terminal, or shipped in).
-// Only the middle one is a problem worth a warning.
+// Two independent questions about the build controls.
+//
+// Can they work here: Composer, a PHP binary, proc_open() and a writable
+// module directory. checkBuildRequirements() answers that, and it is what
+// hides the controls after a zip deploy, which lands read only.
+//
+// Should they be offered at all: releases ship precompiled, so an ordinary
+// installation never builds and the button is only a way to break a working
+// one. It is a developer tool, shown when Dolibarr itself is not in
+// production mode, with a constant to force it on for someone debugging a
+// production box.
+global $dolibarr_main_prod;
+
 $requirements = $manager->checkBuildRequirements();
 $canBuildHere = !empty($requirements['ok']);
 $published = $manager->isPublished();
+$devMode = empty($dolibarr_main_prod) || getDolGlobalInt('CYPHTWEBMAIL_ENABLE_BUILD');
+$showBuildControls = $canBuildHere && $devMode;
 
+// Nothing published means the webmail cannot run at all. That is worth saying
+// in any mode, so this warning is deliberately not behind $devMode: hiding a
+// broken install from the person who can fix it helps nobody.
 if (!$canBuildHere && !$published) {
 	print '<div class="warning" style="padding: 12px; margin-top: 10px;">';
 	print '<strong>'.$langs->trans("CyphtWebmailCannotBuildHere").'</strong><br><br>';
@@ -179,14 +194,24 @@ if (!$canBuildHere && !$published) {
 	print 'php scripts/build.php';
 	print '</pre>';
 	print '</div>';
-} elseif (!$canBuildHere) {
+} elseif (!$canBuildHere && $devMode) {
 	// Already built and working, just not rebuildable from here. No button and
 	// no log viewer, since neither can do anything; one line saying where to go.
+	// Only in dev mode: on a production install this is noise about something
+	// nobody is expected to do.
+	print load_fiche_titre($langs->trans("CyphtWebmailMaintenance"), '', '');
 	print '<div class="center opacitymedium" style="margin-top: 10px;">';
 	print $langs->trans("CyphtWebmailRebuildFromShell");
 	print ' <code>php scripts/build.php</code>';
 	print '</div>';
-} else {
+} elseif ($showBuildControls) {
+	// Under its own heading rather than filed under build status: compiling is
+	// a developer action, not part of installing, and putting it beside the
+	// version table invited people to treat it as a required step.
+	print load_fiche_titre($langs->trans("CyphtWebmailMaintenance"), '', '');
+	print '<div class="center opacitymedium" style="margin-bottom: 8px;">';
+	print $langs->trans("CyphtWebmailMaintenanceHint");
+	print '</div>';
 	print '<div class="center" style="margin-top: 10px;">';
 	print '<form id="cypht-build-form">';
 	print '<input type="hidden" name="token" value="'.$formToken.'">';
@@ -194,11 +219,24 @@ if (!$canBuildHere && !$published) {
 	print '<button type="submit" class="button" data-loading-text="'.$langs->trans("CyphtWebmailBuilding").'">'.$langs->trans("CyphtWebmailGenerateButton").'</button>';
 	print '</form>';
 	print '</div>';
+} elseif (!$published) {
+	// Production, nothing compiled, but this server could compile if asked.
+	// The controls stay hidden because production installs are meant to run a
+	// shipped build, yet staying silent would leave an administrator looking
+	// at a webmail that cannot start with nothing telling them why.
+	print '<div class="warning" style="padding: 12px; margin-top: 10px;">';
+	print '<strong>'.$langs->trans("CyphtWebmailNeverBuilt").'</strong><br><br>';
+	print $langs->trans("CyphtWebmailBuildFromShell").'<br>';
+	print '<pre style="margin-top: 8px; padding: 8px; background: #f4f4f4; overflow-x: auto;">';
+	print 'cd '.dol_escape_htmltag($manager->getModuleRoot())."\n";
+	print 'php scripts/build.php';
+	print '</pre>';
+	print '</div>';
 }
 
 // The log viewer only ever shows browser builds, so it follows the button:
 // where one cannot run, the other has nothing to show.
-if ($canBuildHere) {
+if ($showBuildControls) {
 	// 'out' = real child-process output, 'err' = our own failure messages,
 	// 'info' = our own step/status lines. Stderr is not colored red just for
 	// being stderr; see CyphtPipeline::runProcess().
