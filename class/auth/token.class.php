@@ -87,6 +87,18 @@ class CyphtToken
 
 		$secret = CyphtConfig::get($this->db, 'USER_CONFIG_SECRET', '');
 		if ($secret !== '') {
+			/* This early return is load bearing, not an optimisation.
+			 *
+			 * Every mailbox password in llx_cyphtwebmail_userconfig is
+			 * encrypted with this value. Replacing it does not fail loudly:
+			 * the rows stay, decryption silently produces nothing, and every
+			 * user finds their accounts empty with no error and no way back,
+			 * because the key that would have read them is gone.
+			 *
+			 * Activation and the upgrade check both call this on a live
+			 * installation, so it must always return what is already stored.
+			 * Anything that deliberately rotates this key has to re-encrypt
+			 * every stored config in the same transaction. */
 			return $secret;
 		}
 
