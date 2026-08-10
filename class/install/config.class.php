@@ -110,8 +110,12 @@ class CyphtConfig
 
 	/**
 	 * Fetch or mint. Used for the three generated secrets, where re-running
-	 * activation must never roll a new value: changing USER_CONFIG_SECRET
-	 * would orphan every stored mailbox password.
+	 * activation must never roll a new value.
+	 *
+	 * There is deliberately no counterpart that overwrites an existing secret.
+	 * Rotating USER_CONFIG_SECRET without re-encrypting every stored config
+	 * empties every mailbox account in the installation, silently, so the only
+	 * way to do it is to write that migration first.
 	 *
 	 * @param DoliDB $db
 	 * @param string $name
