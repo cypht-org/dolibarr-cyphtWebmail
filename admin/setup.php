@@ -56,6 +56,15 @@ $action = GETPOST('action', 'aZ09');
 $manager = new CyphtWebmail($db);
 $buildResult = null;
 
+// Same self-triggering upgrade check as the webmail entry point: an admin
+// opening this page after replacing the files should not have to know that
+// disabling and re-enabling the module is what applies them.
+require_once __DIR__.'/../class/install/upgrade.class.php';
+$cyphtUpgrade = new CyphtUpgrade($db);
+if (!$cyphtUpgrade->run()) {
+	setEventMessages($cyphtUpgrade->error, null, 'warnings');
+}
+
 if ($action == 'update_settings') {
 	dolibarr_set_const($db, 'CYPHTWEBMAIL_IMAP_NAME', GETPOST('imap_name', 'alphanohtml'), 'chaine', 0, '', $conf->entity);
 	dolibarr_set_const($db, 'CYPHTWEBMAIL_IMAP_SERVER', GETPOST('imap_server', 'alphanohtml'), 'chaine', 0, '', $conf->entity);
@@ -129,9 +138,29 @@ $installedVersion = $manager->getInstalledVersion();
 print $installedVersion ? dol_escape_htmltag($installedVersion) : '<span class="error">'.$langs->trans("CyphtWebmailNotInstalled").'</span>';
 print '</td></tr>';
 
+// build.json travels with the build, so it is the only thing a prebuilt
+// release can answer this with. CYPHTWEBMAIL_BUILT_VERSION is written to
+// llx_const by a Dolibarr build and is therefore empty on every shipped zip.
+$buildInfo = $manager->getBuildInfo();
+
+print '<tr class="oddeven"><td>'.$langs->trans("CyphtWebmailModuleVersion").'</td><td>';
+print (!empty($buildInfo['module_version']))
+	? dol_escape_htmltag($buildInfo['module_version'])
+	: '<span class="opacitymedium">-</span>';
+print '</td></tr>';
+
 print '<tr class="oddeven"><td>'.$langs->trans("CyphtWebmailBuiltVersion").'</td><td>';
-$builtVersion = $manager->getBuiltVersion();
-print $builtVersion ? dol_escape_htmltag($builtVersion) : $langs->trans("CyphtWebmailNeverBuilt");
+$builtVersion = (!empty($buildInfo['cypht_version'])) ? $buildInfo['cypht_version'] : $manager->getBuiltVersion();
+if ($builtVersion) {
+	print dol_escape_htmltag($builtVersion);
+	// Catches someone running composer update underneath a compiled build:
+	// public/ was generated against one Cypht and vendor/ now holds another.
+	if ($installedVersion && $installedVersion !== $builtVersion) {
+		print ' <span class="warning">'.$langs->trans("CyphtWebmailVersionMismatch", $builtVersion, $installedVersion).'</span>';
+	}
+} else {
+	print $langs->trans("CyphtWebmailNeverBuilt");
+}
 print '</td></tr>';
 
 print '<tr class="oddeven"><td>'.$langs->trans("CyphtWebmailLastBuild").'</td><td>';
