@@ -1,0 +1,27 @@
+-- Copyright (C) 2026  Camile   <camilevahviraki@gmail.com>
+--
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program.  If not, see https://www.gnu.org/licenses/.
+--
+-- Migration 002: record which Cypht version wrote each stored user config.
+--
+-- The config column is a JSON blob whose shape belongs to Cypht, not to this
+-- module. If a future Cypht changes that shape there is currently no way to
+-- tell which rows are in the old form, which turns a writable migration into
+-- guesswork. Recording the version costs one small column per row now and is
+-- the only thing that makes such a conversion possible later.
+--
+-- Nullable on purpose: rows written before this column existed genuinely do
+-- not know, and a default would be a lie about them.
+
+ALTER TABLE llx_cyphtwebmail_userconfig ADD COLUMN cypht_version varchar(32) NULL;
