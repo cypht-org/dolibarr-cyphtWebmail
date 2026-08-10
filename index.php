@@ -56,6 +56,19 @@ if (!isModEnabled('cyphtwebmail')) {
 
 $manager = new CyphtWebmail($db);
 
+/* Dolibarr calls nothing when a module's files are replaced, so an upgrade has
+ * to notice for itself. Normally this is a single indexed read that finds the
+ * version already current and returns. The one time it does work is the first
+ * request after new files land, which is exactly when nothing else would.
+ *
+ * A failure here is not fatal: the webmail may well still work, and refusing
+ * to load would turn a partial upgrade into an outage. It is logged instead. */
+require_once __DIR__.'/class/install/upgrade.class.php';
+$cyphtUpgrade = new CyphtUpgrade($db);
+if (!$cyphtUpgrade->run()) {
+	dol_syslog('CyphtWebmail upgrade check: '.$cyphtUpgrade->error, LOG_WARNING);
+}
+
 // Current Cypht page, carried in one opaque parameter holding Cypht's own
 // query string. Nested rather than mirrored because Cypht uses page/id/uid
 // and Dolibarr uses action/id/token: merging the namespaces collides on "id".
