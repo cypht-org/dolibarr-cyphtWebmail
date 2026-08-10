@@ -646,7 +646,7 @@ class modcyphtWebmail extends DolibarrModules
 		 * is outside the web root and writable by the webserver. That is the
 		 * whole point: an installed module should never need write access to
 		 * its own folder. */
-		if ($this->provisionInstallation() < 0) {
+		if ($this->runUpgrade() < 0) {
 			return -1;
 		}
 
@@ -714,42 +714,22 @@ class modcyphtWebmail extends DolibarrModules
 	}
 
 	/**
-	 * Create the per-installation state a distributed build cannot contain.
+	 * Bring this installation up to the schema the code expects.
 	 *
-	 * Three secrets and two directories. The secrets are minted once and kept
-	 * in llx_const, so re-activating an existing installation is harmless:
-	 * each getOrCreate* returns what is already there rather than rolling a
-	 * new value, which matters because changing USER_CONFIG_SECRET would
-	 * orphan every stored mailbox password.
-	 *
-	 * Read back at runtime by CyphtEnvBootstrap, which is why none of it is
-	 * written to a file.
+	 * Activation and upgrade share one path. CyphtUpgrade is idempotent, so
+	 * enabling an already provisioned installation returns the existing
+	 * secrets rather than minting new ones, which matters because
+	 * USER_CONFIG_SECRET decrypts every stored mailbox password.
 	 *
 	 * @return int<-1,1> 1 on success, -1 on failure
 	 */
-	private function provisionInstallation()
+	private function runUpgrade()
 	{
-		global $conf, $langs;
+		require_once __DIR__ . '/../../class/install/upgrade.class.php';
 
-		require_once __DIR__ . '/../../class/install/paths.class.php';
-		require_once __DIR__ . '/../../class/auth/token.class.php';
-
-		try {
-			$token = new CyphtToken($this->db);
-
-			// SSO assertions, encryption of stored mailbox passwords, and
-			// Cypht's own per-site fingerprint input.
-			$token->getOrCreateSsoSecret();
-			$token->getOrCreateConfigSecret();
-			$token->getOrCreateSiteId();
-
-			// Cypht writes user settings and in-progress attachments here.
-			// getDataDir() creates both subdirectories.
-			$paths = new CyphtPaths();
-			$paths->getDataDir();
-		} catch (Exception $e) {
-			$langs->load("errors");
-			$this->error = 'CyphtWebmail could not provision this installation: ' . $e->getMessage();
+		$upgrade = new CyphtUpgrade($this->db);
+		if (!$upgrade->run(true)) {
+			$this->error = $upgrade->error;
 
 			return -1;
 		}
