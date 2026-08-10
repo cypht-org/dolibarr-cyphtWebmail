@@ -78,6 +78,14 @@ class CyphtEnvBootstrap
 
 		$values = $this->fromConf($conf);
 
+		/* Cypht's own VERSION constant is its internal framework number (0.1),
+		 * not the release. The real one is recorded by the build, so publish it
+		 * here for anything that needs to stamp what wrote a record. */
+		$build = $this->readBuildInfo();
+		if (isset($build['cypht_version']) && $build['cypht_version'] !== '') {
+			$values['CYPHT_VERSION'] = (string) $build['cypht_version'];
+		}
+
 		$consts = $this->readConsts($conf);
 		if ($consts === null) {
 			/* Reaching conf.php but not the database is worth distinguishing:
@@ -99,6 +107,23 @@ class CyphtEnvBootstrap
 		}
 
 		return $consts !== null;
+	}
+
+	/**
+	 * What the build recorded about itself.
+	 *
+	 * @return array<string,mixed>
+	 */
+	private function readBuildInfo()
+	{
+		$file = $this->moduleRoot . '/build.json';
+		if (!is_readable($file)) {
+			return array();
+		}
+
+		$data = json_decode((string) file_get_contents($file), true);
+
+		return is_array($data) ? $data : array();
 	}
 
 	/**
