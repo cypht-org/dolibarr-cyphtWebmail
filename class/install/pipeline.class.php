@@ -602,28 +602,55 @@ class CyphtPipeline
 			return false;
 		}
 
-		$replacement = "define('APP_PATH', dirname(__DIR__).'/vendor/jason-munro/cypht/');";
-
-		/* Matched on the define rather than on the path itself: the baked value
-		 * carries the build host's separators, which differ between Windows and
-		 * POSIX, and would otherwise need escaping to match. */
-		$patched = preg_replace(
+		/* 1. Self-locating APP_PATH.
+		 *
+		 * Matched on the define rather than on the path itself: the baked
+		 * value carries the build host's separators, which differ between
+		 * Windows and POSIX, and would otherwise need escaping to match. */
+		$content = preg_replace(
 			"/define\(\s*'APP_PATH'\s*,\s*'[^']*'\s*\);/",
-			$replacement,
+			"define('APP_PATH', dirname(__DIR__).'/vendor/jason-munro/cypht/');"
+				. "\n\nrequire_once dirname(__DIR__).'/class/runtime/envbootstrap.class.php';"
+				. "\n\$cyphtEnvBootstrap = new CyphtEnvBootstrap(dirname(__DIR__));"
+				. "\n\$cyphtEnvBootstrap->apply();",
 			$content,
 			1,
-			$count
+			$countPath
 		);
 
-		if ($patched === null || $count !== 1) {
+		if ($content === null || $countPath !== 1) {
 			/* Upstream changed the shape of the define. Failing loudly beats
 			 * publishing a build that only runs on this machine. */
 			$this->error = 'Could not rewrite APP_PATH in ' . $indexFile .
-				' (matched ' . (int) $count . ' times). Cypht\'s entry point template may have changed.';
+				' (matched ' . (int) $countPath . ' times). Cypht\'s entry point template may have changed.';
 			return false;
 		}
 
-		if (file_put_contents($indexFile, $patched) === false) {
+		/* 2. Per-installation SITE_ID.
+		 *
+		 * The bootstrap above has already populated $_ENV, which is why it is
+		 * injected before this define rather than after: SITE_ID is fixed near
+		 * the top of the entry point, long before Cypht loads its own config.
+		 *
+		 * The compiled literal stays as the fallback. It is shared across
+		 * installations and therefore not what we want, but a Cypht that
+		 * starts with a weak site id beats one that will not start at all
+		 * because the database was briefly unreachable. */
+		$content = preg_replace(
+			"/define\(\s*'SITE_ID'\s*,\s*'([^']*)'\s*\);/",
+			"define('SITE_ID', (isset(\$_ENV['CYPHT_SITE_ID']) && \$_ENV['CYPHT_SITE_ID'] !== '') ? \$_ENV['CYPHT_SITE_ID'] : '$1');",
+			$content,
+			1,
+			$countSite
+		);
+
+		if ($content === null || $countSite !== 1) {
+			$this->error = 'Could not rewrite SITE_ID in ' . $indexFile .
+				' (matched ' . (int) $countSite . ' times).';
+			return false;
+		}
+
+		if (file_put_contents($indexFile, $content) === false) {
 			$this->error = 'Could not write ' . $indexFile;
 			return false;
 		}
@@ -880,14 +907,23 @@ class CyphtPipeline
 		}
 		$emit(sprintf("[copy finished in %.1fs]\n", microtime(true) - $stepStart));
 
-		// main.inc.php pulls admin.lib.php in for us; master.inc.php, which is
-		// all a command line build loads, does not. Ask for it here so the
-		// build does not die on the last line after doing all the work.
-		require_once DOL_DOCUMENT_ROOT . '/core/lib/admin.lib.php';
-
 		$version = $this->paths->getInstalledVersion();
-		dolibarr_set_const($this->db, 'CYPHTWEBMAIL_LAST_BUILD', dol_now(), 'chaine', 0, '', $conf->entity);
-		dolibarr_set_const($this->db, 'CYPHTWEBMAIL_BUILT_VERSION', $version, 'chaine', 0, '', $conf->entity);
+
+		/* Recording what was built is a Dolibarr bookkeeping step, not part of
+		 * compiling, so an offline build simply skips it. There is no llx_const
+		 * to write to and no $conf->entity to scope it by; the setup page reads
+		 * these back only where Dolibarr exists. */
+		if ($this->db !== null) {
+			global $conf;
+
+			// main.inc.php pulls admin.lib.php in for us; master.inc.php, which
+			// is all a command line build loads, does not. Ask for it here so
+			// the build does not die on the last line after doing all the work.
+			require_once DOL_DOCUMENT_ROOT . '/core/lib/admin.lib.php';
+
+			dolibarr_set_const($this->db, 'CYPHTWEBMAIL_LAST_BUILD', dol_now(), 'chaine', 0, '', $conf->entity);
+			dolibarr_set_const($this->db, 'CYPHTWEBMAIL_BUILT_VERSION', $version, 'chaine', 0, '', $conf->entity);
+		}
 
 		$emit("Published to " . $this->paths->getPublicPath() . "\nBuild complete. Cypht " . $version . " is live.\n");
 
