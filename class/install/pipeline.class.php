@@ -578,6 +578,53 @@ class CyphtPipeline
 	}
 
 	/**
+	 * Record what this build contains, at the module root.
+	 *
+	 * A release is a compiled tree with no database behind it, so nothing else
+	 * says which module version it is or which Cypht went into it.
+	 * CYPHTWEBMAIL_BUILT_VERSION covers that today, but it is written to
+	 * llx_const by a Dolibarr build, so it is simply absent from every
+	 * prebuilt zip.
+	 *
+	 * Belongs inside the module directory precisely because it describes the
+	 * build rather than the installation: an upgrade replaces that directory,
+	 * and this file should be replaced along with it.
+	 *
+	 * The module version is read out of the descriptor with a regex rather
+	 * than by loading the class, because an offline build has no Dolibarr and
+	 * DolibarrModules cannot be instantiated without it.
+	 *
+	 * @param string|null $cyphtVersion As reported by Composer's installed.json
+	 * @return void
+	 */
+	private function writeBuildInfo($cyphtVersion)
+	{
+		$root = $this->paths->getModuleRoot();
+
+		$moduleVersion = null;
+		$descriptor = $root . '/core/modules/modcyphtWebmail.class.php';
+		if (is_readable($descriptor)) {
+			$source = file_get_contents($descriptor);
+			if ($source !== false && preg_match("/\\\$this->version\s*=\s*'([^']+)'/", $source, $m)) {
+				$moduleVersion = $m[1];
+			}
+		}
+
+		$info = array(
+			'module_version' => $moduleVersion,
+			'cypht_version' => $cyphtVersion,
+			'built_at' => gmdate('c'),
+		);
+
+		/* A build that has produced a working public/ should not
+		 * be reported as failed because this note could not be written. */
+		@file_put_contents(
+			$root . '/build.json',
+			json_encode($info, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n"
+		);
+	}
+
+	/**
 	 * Replace the one absolute path in the published entry point with an
 	 * expression that resolves itself.
 	 *
@@ -908,6 +955,10 @@ class CyphtPipeline
 		$emit(sprintf("[copy finished in %.1fs]\n", microtime(true) - $stepStart));
 
 		$version = $this->paths->getInstalledVersion();
+
+		/* Written for every build, including offline ones, because it is the
+		 * only record a shipped release carries of what went into it. */
+		$this->writeBuildInfo($version);
 
 		/* Recording what was built is a Dolibarr bookkeeping step, not part of
 		 * compiling, so an offline build simply skips it. There is no llx_const
