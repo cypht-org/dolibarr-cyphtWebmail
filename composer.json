@@ -5,9 +5,6 @@
     "require": {
         "jason-munro/cypht": "^2.11"
     },
-    "replace": {
-        "garethp/php-ews": "*"
-    },
     "autoload": {
         "psr-4": {
             "Evoludata\\CyphtModule\\": "src/"
