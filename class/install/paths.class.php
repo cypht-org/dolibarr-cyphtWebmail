@@ -78,6 +78,20 @@ class CyphtPaths
 	 */
 	public function getDataDir()
 	{
+		/* An offline build has no Dolibarr and therefore no managed data
+		 * directory. Nothing in that build stores user data; the only caller
+		 * that gets this far is the build lock. Somewhere outside the module
+		 * is deliberate, so a stray lock file cannot end up in a release
+		 * archive. */
+		if (!defined('DOL_DATA_ROOT')) {
+			$dir = rtrim(sys_get_temp_dir(), '/\\') . '/cyphtwebmail-build';
+			if (!is_dir($dir)) {
+				@mkdir($dir, 0775, true);
+			}
+
+			return $dir;
+		}
+
 		$dir = DOL_DATA_ROOT . '/cyphtWebmail';
 
 		require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
