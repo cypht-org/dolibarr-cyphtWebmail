@@ -858,10 +858,20 @@ class Custom_User_Config extends Hm_Config {
         // character of the query and only recognises lower case, so an
         // uppercase UPDATE would be treated as a select and never report a
         // row count.
+        /* Stamped on every write so a future Cypht that changes the shape of
+         * this blob can be migrated rather than guessed at.
+         *
+         * Not Cypht's VERSION constant: that is its internal framework number,
+         * 0.1, and stamping it would record the same meaningless value on
+         * every row. The release version comes from build.json, which the
+         * build writes and the runtime bootstrap publishes. */
+        $cyphtVersion = Hm_Environment::get('CYPHT_VERSION', '');
+        $cyphtVersion = ($cyphtVersion !== '') ? (string) $cyphtVersion : null;
+
         $updated = Hm_DB::execute(
             $dbh,
-            'update '.$this->prefix().'cyphtwebmail_userconfig set config = ? where fk_user = ? and entity = ?',
-            array($payload, $fkUser, $entity),
+            'update '.$this->prefix().'cyphtwebmail_userconfig set config = ?, cypht_version = ? where fk_user = ? and entity = ?',
+            array($payload, $cyphtVersion, $fkUser, $entity),
             'modify'
         );
 
@@ -874,8 +884,8 @@ class Custom_User_Config extends Hm_Config {
 
         $inserted = Hm_DB::execute(
             $dbh,
-            'insert into '.$this->prefix().'cyphtwebmail_userconfig (entity, fk_user, config, date_creation) values (?, ?, ?, ?)',
-            array($entity, $fkUser, $payload, date('Y-m-d H:i:s')),
+            'insert into '.$this->prefix().'cyphtwebmail_userconfig (entity, fk_user, config, cypht_version, date_creation) values (?, ?, ?, ?, ?)',
+            array($entity, $fkUser, $payload, $cyphtVersion, date('Y-m-d H:i:s')),
             'insert'
         );
 
