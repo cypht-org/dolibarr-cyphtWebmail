@@ -476,9 +476,6 @@ var dolibarr_mail_templates_init = function() {
         return; /* not the compose page, or nothing to show */
     }
 
-    /* Both entry points below can fire against one render, and the listeners
-     * would stack. The flag lives on the button, so a page swap that brings a
-     * fresh one starts clean. */
     if (toggle.getAttribute('data-dolibarr-bound') === '1') {
         return;
     }
@@ -511,15 +508,7 @@ var dolibarr_mail_templates_init = function() {
 
 /* Two entry points, because there are two ways to arrive at compose.
  *
- * A full page load fires document ready. An in-app navigation does not: it
- * swaps #cypht-main and calls the route handler registered for the page,
- * within the same document, so ready never fires a second time. Relying on
- * ready alone left the picker wherever the output module had rendered it, at
- * the end of the form, with nothing bound to its button.
- *
- * Wrapping is safe this early: routes.js resolves handler names off window
- * when it builds ROUTES, and config_gen appends the navigation files after
- * every module, so this replacement is what gets registered. */
+ */
 var dolibarr_mail_templates_compose_handler = window.applyComposePageHandlers;
 window.applyComposePageHandlers = function(routeParams) {
     var unmount = dolibarr_mail_templates_compose_handler

@@ -370,11 +370,8 @@ if ($masterIncPath === '') {
 	}
 	cyphtSay("wrote build defaults to vendor/jason-munro/cypht/.env\n", $options['quiet']);
 
-	// Nulls for the Dolibarr-bound dependencies; the compile half never reads them.
 	$offline = new CyphtPipeline(null, $paths, null, $vendorLayout, null, $patches, $installer);
 
-	/* runConfigGen() is the whole three step pipeline, composer then
-	 * config_gen then publish, so there is no separate publish call here. */
 	$genResult = $offline->runConfigGen(function ($chunk) use ($options) {
 		cyphtSay($chunk, $options['quiet']);
 	});
@@ -383,9 +380,6 @@ if ($masterIncPath === '') {
 		exit(1);
 	}
 
-	cyphtSay("\nBuilt. public/ is compiled and carries no machine specific path.\n", $options['quiet']);
-	cyphtSay("Database credentials, secrets and bridge URLs are written when the\n", $options['quiet']);
-	cyphtSay("module is activated in Dolibarr, or when its setup page is saved.\n", $options['quiet']);
 	exit(0);
 }
 
