@@ -86,7 +86,7 @@ class CyphtContactSource
 			return $url;
 		}
 
-		return dol_buildpath('/cyphtWebmail/bridge/contacts.php', 2);
+		return dol_buildpath('/cyphtwebmail/bridge/contacts.php', 2);
 	}
 
 }
