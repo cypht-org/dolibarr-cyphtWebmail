@@ -547,67 +547,71 @@ class CyphtPipeline
 		}
 
 		$publicPath = $this->paths->getPublicPath();
-		// Wipe the previous published copy so stale files never linger after an update.
-		if (is_dir($publicPath)) {
-			$this->vendorBridge->deleteRecursive($publicPath);
-		}
+		$staging = $publicPath . '.new';
+		$previous = $publicPath . '.old';
 
-		$this->vendorBridge->copyRecursive($sitePath, $publicPath);
-
-		if (!file_exists($publicPath . '/index.php')) {
-			$this->error = 'Publish copied no index.php into ' . $publicPath;
-			return false;
-		}
-
-		return $this->makeIndexRelocatable($publicPath . '/index.php');
-	}
-
-	/**
-	 * Record what this build contains, at the module root.
-	 *
-	 * CYPHTWEBMAIL_BUILT_VERSION lives in llx_const, so it is absent from a
-	 * prebuilt zip. This file ships with the build instead.
-	 *
-	 * Version read from the descriptor by regex: an offline build has no
-	 * Dolibarr, so DolibarrModules cannot be instantiated.
-	 *
-	 * @param string|null $cyphtVersion As reported by Composer's installed.json
-	 * @return void
-	 */
-	private function writeBuildInfo($cyphtVersion)
-	{
-		$root = $this->paths->getModuleRoot();
-
-		$moduleVersion = null;
-		$descriptor = $root . '/core/modules/modcyphtWebmail.class.php';
-		if (is_readable($descriptor)) {
-			$source = file_get_contents($descriptor);
-			if ($source !== false && preg_match("/\\\$this->version\s*=\s*'([^']+)'/", $source, $m)) {
-				$moduleVersion = $m[1];
+		/* Leftovers from a publish that died midway. Removed rather than reused:
+		 * a half-copied staging directory would otherwise be swapped in as if it
+		 * were a finished build. */
+		foreach (array($staging, $previous) as $leftover) {
+			if (is_dir($leftover)) {
+				$this->vendorBridge->deleteRecursive($leftover);
 			}
 		}
 
-		$info = array(
-			'module_version' => $moduleVersion,
-			'cypht_version' => $cyphtVersion,
-			'built_at' => gmdate('c'),
-		);
+		$this->vendorBridge->copyRecursive($sitePath, $staging);
 
-		/* A build that has produced a working public/ should not
-		 * be reported as failed because this note could not be written. */
-		@file_put_contents(
-			$root . '/build.json',
-			json_encode($info, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n"
-		);
+		if (!file_exists($staging . '/index.php')) {
+			$this->error = 'Publish copied no index.php into ' . $staging;
+			$this->vendorBridge->deleteRecursive($staging);
+			return false;
+		}
+
+		// Rewritten before the swap, so a published public/ is never briefly
+		// carrying the build machine's path.
+		if (!$this->makeIndexRelocatable($staging . '/index.php')) {
+			$this->vendorBridge->deleteRecursive($staging);
+			return false;
+		}
+
+		/* Preferred finish: two renames, so the old copy is only destroyed once
+		 * the new one is in place. */
+		$moved = (!is_dir($publicPath) || @rename($publicPath, $previous));
+		if ($moved && @rename($staging, $publicPath)) {
+			if (is_dir($previous)) {
+				$this->vendorBridge->deleteRecursive($previous);
+			}
+
+			return true;
+		}
+
+		if ($moved && is_dir($previous)) {
+			// Second rename failed with the old copy already moved aside.
+			@rename($previous, $publicPath);
+		}
+
+		$this->vendorBridge->deleteRecursive($publicPath);
+		$this->vendorBridge->copyRecursive($staging, $publicPath);
+
+		if (!file_exists($publicPath . '/index.php')) {
+			$this->error = 'Could not replace ' . $publicPath . '. The finished build is in '
+				. $staging . '; copy it over ' . $publicPath . ' to recover.';
+			return false;
+		}
+
+		$this->vendorBridge->deleteRecursive($staging);
+
+		return true;
 	}
+
 
 	/**
 	 * Replace the one absolute path in the published entry point with an
 	 * expression that resolves itself.
 	 *
-	 * config_gen.php:658 bakes the build machine's directory into APP_PATH.
-	 * It is the only build-machine path in the output (config/dynamic.php
-	 * has none), so rewriting this line is what makes a build shippable.
+	 * config_gen.php:658 bakes the build machine's directory into APP_PATH,
+	 * the only such path in the output, so this is what makes a build
+	 * shippable.
 	 *
 	 * @param string $indexFile Published public/index.php
 	 * @return bool
@@ -644,12 +648,9 @@ class CyphtPipeline
 			return false;
 		}
 
-		/* 2. Per-installation SITE_ID.
-		 *
-		 * The bootstrap is injected above this define because SITE_ID is set
-		 * near the top of the entry point, before Cypht loads its config.
-		 * The compiled literal stays as a fallback: a weak site id beats not
-		 * starting because the database was briefly unreachable. */
+		/* 2. Per-installation SITE_ID. The compiled literal stays as a
+		 * fallback: a weak site id beats not starting because the database
+		 * was briefly unreachable. */
 		$content = preg_replace(
 			"/define\(\s*'SITE_ID'\s*,\s*'([^']*)'\s*\);/",
 			"define('SITE_ID', (isset(\$_ENV['CYPHT_SITE_ID']) && \$_ENV['CYPHT_SITE_ID'] !== '') ? \$_ENV['CYPHT_SITE_ID'] : '$1');",
@@ -724,11 +725,9 @@ class CyphtPipeline
 		$this->debugLog('=== runConfigGen() starting ===');
 		$this->debugLog('PHP version: ' . phpversion() . ', OS: ' . PHP_OS . ', SAPI: ' . php_sapi_name());
 
-		// A build is minutes of work in one request. Without these two, PHP's
-		// execution limit or the user closing the tab kills it mid-pipeline,
-		// which is how builds ended up dying after the SSO override with no
-		// error logged and a lock file left behind (the kill skips the
-		// finally block below).
+		// A build is minutes of work in one request. Without these, PHP's time
+		// limit or a closed tab kills it mid-pipeline, skipping the finally
+		// block below and stranding the lock file.
 		@set_time_limit(0);
 		@ignore_user_abort(true);
 
@@ -842,18 +841,18 @@ class CyphtPipeline
 		// ---- Step 2/3: config_gen.php ----
 		$emit("\n== Step 2/3: php scripts/config_gen.php ==\n");
 
-		/* Offline builds arrive with no envConfig and a .env already holding
-		 * the build defaults, which is all config_gen.php reads. Skipping
-		 * beats refusing to compile without a database. */
-		if ($this->envConfig !== null) {
-			if (!$this->envConfig->writeEnvFile($this->envConfig->buildEnvOverrides())) {
-				$this->error = $this->envConfig->error;
-				$emit($this->error . "\n", 'err');
-				return array('success' => false, 'output' => $log, 'error' => $this->error);
-			}
-		} else {
-			$emit("no Dolibarr: keeping the build defaults already in .env\n");
+		/* Build defaults only, on every path in. Installation values are read at
+		 * runtime by CyphtEnvBootstrap, so baking them here would tie the output
+		 * to one machine and ship its credentials in any zip. Rebuilt from
+		 * .env.example so a build cannot inherit the values of the installation
+		 * it is running inside. */
+		$envError = '';
+		if (!CyphtEnvironment::writeEnvTo($this->paths->getCyphtPath(), CyphtEnvironment::buildTimeDefaults(), $envError, true)) {
+			$this->error = $envError;
+			$emit($this->error . "\n", 'err');
+			return array('success' => false, 'output' => $log, 'error' => $this->error);
 		}
+		$emit("wrote build defaults to .env; this installation's values are read at runtime.\n");
 
 		if (!$this->vendorBridge->ensureCyphtVendorBridge()) {
 			$this->error = $this->vendorBridge->error;
@@ -915,12 +914,9 @@ class CyphtPipeline
 
 		$version = $this->paths->getInstalledVersion();
 
-		/* Written for every build, including offline ones, because it is the
-		 * only record a shipped release carries of what went into it. */
-		$this->writeBuildInfo($version);
+		// Written for every build
+		$this->paths->writeBuildInfo($version);
 
-		/* Bookkeeping, not compiling: an offline build has no llx_const to
-		 * write to and no $conf->entity to scope it by. */
 		if ($this->db !== null) {
 			global $conf;
 
