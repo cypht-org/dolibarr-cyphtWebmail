@@ -156,21 +156,21 @@ class CyphtEnvironment
 	}
 
 	/**
-	 * The same write, without needing an instance.
-	 *
-	 * An offline build has no database handle or token store, so it cannot
-	 * construct this class, but still has to put CYPHT_MODULES in front of
-	 * config_gen.php. Activation merges the installation half over the top.
+	 * The same write, without needing an instance: an offline build has no
+	 * database handle to construct one with.
 	 *
 	 * @param string $cyphtPath Cypht root inside vendor/
 	 * @param array<string,string> $overrides Key/value pairs to force
 	 * @param string $error Set on failure
+	 * @param bool $fresh Start from .env.example even when a .env exists, so a
+	 *                    build cannot inherit the values of the installation it
+	 *                    happens to be running inside
 	 * @return bool
 	 */
-	public static function writeEnvTo($cyphtPath, array $overrides, &$error = '')
+	public static function writeEnvTo($cyphtPath, array $overrides, &$error = '', $fresh = false)
 	{
 		$envFile = $cyphtPath . '/.env';
-		$source = file_exists($envFile) ? $envFile : $cyphtPath . '/.env.example';
+		$source = (!$fresh && file_exists($envFile)) ? $envFile : $cyphtPath . '/.env.example';
 
 		if (!file_exists($source)) {
 			$error = 'Neither .env nor .env.example found in ' . $cyphtPath . '. Is Cypht actually installed under vendor/?';
