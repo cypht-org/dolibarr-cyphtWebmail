@@ -21,22 +21,8 @@
  * \ingroup     cyphtWebmail
  * \brief       Command line build, in two modes.
  *
- *              prepare  Fetch dependencies and install this module's Cypht
- *                       module sets. Needs neither Dolibarr nor a database,
- *                       so it runs on a laptop or in CI before the module is
- *                       installed anywhere. This is what to run before zipping.
- *
- *              build    Everything prepare does, plus writing Cypht's .env
- *                       from Dolibarr's settings, compiling the app and
- *                       publishing it.
- *
- *              The split is about credentials, not portability. config_gen.php
- *              bakes the build machine's path into public/index.php, but
- *              makeIndexRelocatable() rewrites it at publish time, so a
- *              compiled tree can be zipped and shipped. What cannot be
- *              produced here is the installation half of the configuration:
- *              database credentials, generated secrets and bridge URLs, which
- *              are written when the module is activated in Dolibarr.
+ *              prepare  Dependencies and module sets only. Run before zipping.
+ *              build    Prepare, then compile and publish.
  */
 
 if (substr(php_sapi_name(), 0, 3) !== 'cli') {
@@ -250,9 +236,45 @@ $patches = new CyphtUpstreamPatches($paths);
 if ($options['mode'] === 'prepare') {
 	cyphtPrepare($root, $options, $vendorLayout, $installer, $patches);
 
+	// The tree this produces is what gets zipped, so it records itself here
+	// rather than shipping whatever the last build on this machine left behind.
+	$paths->writeBuildInfo();
+
 	cyphtSay("\nPrepared. Dependencies and module sets are in place.\n", $options['quiet']);
 	cyphtSay("The app itself is not compiled yet. Run a full build to produce public/.\n", $options['quiet']);
 	exit(0);
+}
+
+/**
+ * Walk up from the module looking for a Dolibarr to load.
+ *
+ * Every ancestor is tried rather than two or three fixed depths: the module is
+ * only conventionally at htdocs/custom/<name>, and is just as often symlinked
+ * in, nested deeper, or kept outside the tree entirely. Each level is checked
+ * for master.inc.php directly and for an htdocs/ holding one, which covers
+ * both sitting inside the web root and sitting beside it.
+ *
+ * @param string $start Module root
+ * @return string Path to master.inc.php, or '' when there is no Dolibarr above
+ */
+function cyphtFindDolibarr($start)
+{
+	$dir = $start;
+
+	while (true) {
+		foreach (array($dir.'/master.inc.php', $dir.'/htdocs/master.inc.php') as $candidate) {
+			if (is_file($candidate)) {
+				return $candidate;
+			}
+		}
+
+		// dirname() is its own parent at the filesystem root, on both platforms.
+		$parent = dirname($dir);
+		if ($parent === $dir) {
+			return '';
+		}
+		$dir = $parent;
+	}
 }
 
 /**
@@ -326,36 +348,14 @@ if (!is_dir($root.'/vendor/jason-munro/cypht')) {
 }
 
 /*
- * Step 3: the full build. Dolibarr from here on, because the .env is written
- * from this installation's database credentials and stored secrets.
+ * Step 3: the full build. Dolibarr is loaded from here on for the bookkeeping
+ * it owns, the last build date and version in llx_const. The compile itself
+ * needs none of it.
  */
 if ($masterIncPath === '') {
-	// Walk up from the module, which covers the normal custom/<module> layout.
-	$bootstrap = array(
-		$root.'/../../master.inc.php',
-		$root.'/../../../master.inc.php',
-		$root.'/../../../htdocs/master.inc.php',
-	);
-
-	foreach ($bootstrap as $candidate) {
-		if (is_file($candidate)) {
-			$masterIncPath = $candidate;
-			break;
-		}
-	}
+	$masterIncPath = cyphtFindDolibarr($root);
 }
 
-/*
- * No Dolibarr is no longer fatal. config_gen.php reads only CYPHT_MODULES
- * from the .env and never opens the database, and the one absolute path it
- * bakes into the entry point is rewritten at publish time. So the app can be
- * compiled here, in a bare clone, and the result is portable.
- *
- * What cannot be produced offline is the installation half of the .env:
- * database credentials, the generated secrets, the data directory and the
- * bridge URLs. Those are written when the module is activated in Dolibarr,
- * and rewritten whenever its setup page is saved.
- */
 if ($masterIncPath === '') {
 	cyphtSay("\n== Offline build ==\n", $options['quiet']);
 	cyphtSay("No Dolibarr found, compiling with build defaults only.\n", $options['quiet']);
@@ -485,10 +485,6 @@ if ($options['permissions']) {
 		fwrite(STDERR, "           owned by root; the webserver will not be able to write to it.\n");
 	}
 }
-
-/* No closing banner here: runConfigGen() already reported the build and the
- * version it produced, and repeating it verbatim after the permissions line
- * read like the build had run twice. */
 
 $db->close();
 exit(0);
