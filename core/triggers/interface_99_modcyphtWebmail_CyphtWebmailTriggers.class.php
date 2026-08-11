@@ -34,7 +34,7 @@ class InterfaceCyphtWebmailTriggers extends DolibarrTriggers
 		$this->family = 'cyphtWebmail';
 		$this->description = 'Cleans up webmail data belonging to deleted users';
 		$this->version = '1.0';
-		$this->picto = 'cyphtWebmail@cyphtWebmail';
+		$this->picto = 'cyphtwebmail@cyphtwebmail';
 	}
 
 	/**
