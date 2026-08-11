@@ -28,13 +28,15 @@
  *
  *              build    Everything prepare does, plus writing Cypht's .env
  *                       from Dolibarr's settings, compiling the app and
- *                       publishing it. Needs Dolibarr, because the .env holds
- *                       this installation's database credentials and secrets.
+ *                       publishing it.
  *
- *              The split is not a preference. config_gen.php writes the build
- *              machine's absolute paths into public/index.php and
- *              config/dynamic.php, so a compiled app cannot be moved between
- *              machines. Ship a prepared tree; build on the target.
+ *              The split is about credentials, not portability. config_gen.php
+ *              bakes the build machine's path into public/index.php, but
+ *              makeIndexRelocatable() rewrites it at publish time, so a
+ *              compiled tree can be zipped and shipped. What cannot be
+ *              produced here is the installation half of the configuration:
+ *              database credentials, generated secrets and bridge URLs, which
+ *              are written when the module is activated in Dolibarr.
  */
 
 if (substr(php_sapi_name(), 0, 3) !== 'cli') {
@@ -230,42 +232,6 @@ if ($options['dolibarr'] !== '') {
 	}
 }
 
-/*
- * Step 1: dependencies. Both modes need them.
- */
-$composer = cyphtFindComposer($root);
-
-if ($composer === null) {
-	if (!is_dir($root.'/vendor/jason-munro/cypht')) {
-		fwrite(STDERR, "Composer not found and vendor/jason-munro/cypht is missing.\n");
-		fwrite(STDERR, "Install Composer, or drop a composer.phar in ".$root."\n");
-		exit(1);
-	}
-	cyphtSay("Composer not found; using the vendor/ already on disk.\n", $options['quiet']);
-} else {
-	cyphtSay("== Dependencies ==\n", $options['quiet']);
-	// Composer reports progress on stderr, not stdout, so silencing our own
-	// output is not enough; it has to be told to be quiet itself.
-	$composerArgs = array('install', '--no-interaction', '--no-progress');
-	if ($options['quiet']) {
-		$composerArgs[] = '--quiet';
-	}
-	$code = cyphtRun(array_merge($composer, $composerArgs), $root, $options['quiet']);
-	if ($code !== 0) {
-		fwrite(STDERR, "composer install failed (exit ".$code.").\n");
-		exit(1);
-	}
-}
-
-if (!is_dir($root.'/vendor/jason-munro/cypht')) {
-	fwrite(STDERR, "vendor/jason-munro/cypht is still missing after install.\n");
-	exit(1);
-}
-
-/*
- * Step 2: this module's Cypht module sets and the vendor layout shim. These
- * touch only files, so they work with no Dolibarr and no database.
- */
 require_once $root.'/class/install/paths.class.php';
 require_once $root.'/class/install/vendorlayout.class.php';
 require_once $root.'/class/install/moduleinstaller.class.php';
@@ -276,28 +242,87 @@ $vendorLayout = new CyphtVendorLayout($paths);
 $installer = new CyphtModuleInstaller($paths);
 $patches = new CyphtUpstreamPatches($paths);
 
-cyphtSay("\n== Cypht module sets ==\n", $options['quiet']);
-
-if (!$vendorLayout->ensureCyphtVendorBridge()) {
-	fwrite(STDERR, $vendorLayout->error."\n");
-	exit(1);
-}
-if (!$installer->installAll()) {
-	fwrite(STDERR, $installer->error."\n");
-	exit(1);
-}
-cyphtSay("installed: ".implode(', ', $installer->listModuleSets())."\n", $options['quiet']);
-
-if (!$patches->patchCoreFunctionsGuard()) {
-	fwrite(STDERR, $patches->error."\n");
-	exit(1);
-}
-
+/*
+ * Steps 1 and 2 belong to --prepare alone. A full build calls runConfigGen(),
+ * whose own first step is composer, the module sets and the patches, so doing
+ * them here as well ran the lot twice and reported finishing twice.
+ */
 if ($options['mode'] === 'prepare') {
+	cyphtPrepare($root, $options, $vendorLayout, $installer, $patches);
+
 	cyphtSay("\nPrepared. Dependencies and module sets are in place.\n", $options['quiet']);
-	cyphtSay("The app itself is not compiled: config_gen.php writes absolute paths,\n", $options['quiet']);
-	cyphtSay("so run a full build on the target machine, or press Generate there.\n", $options['quiet']);
+	cyphtSay("The app itself is not compiled yet. Run a full build to produce public/.\n", $options['quiet']);
 	exit(0);
+}
+
+/**
+ * Fetch dependencies and install this module's Cypht module sets.
+ *
+ * Touches only files, so it needs neither Dolibarr nor a database. Exits on
+ * failure rather than returning: there is nothing useful to do afterwards.
+ *
+ * @param string $root Module root
+ * @param array<string,mixed> $options Parsed command line
+ * @param CyphtVendorLayout $vendorLayout
+ * @param CyphtModuleInstaller $installer
+ * @param CyphtUpstreamPatches $patches
+ * @return void
+ */
+function cyphtPrepare($root, array $options, $vendorLayout, $installer, $patches)
+{
+	$composer = cyphtFindComposer($root);
+
+	if ($composer === null) {
+		if (!is_dir($root.'/vendor/jason-munro/cypht')) {
+			fwrite(STDERR, "Composer not found and vendor/jason-munro/cypht is missing.\n");
+			fwrite(STDERR, "Install Composer, or drop a composer.phar in ".$root."\n");
+			exit(1);
+		}
+		cyphtSay("Composer not found; using the vendor/ already on disk.\n", $options['quiet']);
+	} else {
+		cyphtSay("== Dependencies ==\n", $options['quiet']);
+		// Composer reports progress on stderr, not stdout, so silencing our own
+		// output is not enough; it has to be told to be quiet itself.
+		$composerArgs = array('install', '--no-interaction', '--no-progress');
+		if ($options['quiet']) {
+			$composerArgs[] = '--quiet';
+		}
+		$code = cyphtRun(array_merge($composer, $composerArgs), $root, $options['quiet']);
+		if ($code !== 0) {
+			fwrite(STDERR, "composer install failed (exit ".$code.").\n");
+			exit(1);
+		}
+	}
+
+	if (!is_dir($root.'/vendor/jason-munro/cypht')) {
+		fwrite(STDERR, "vendor/jason-munro/cypht is still missing after install.\n");
+		exit(1);
+	}
+
+	cyphtSay("\n== Cypht module sets ==\n", $options['quiet']);
+
+	if (!$vendorLayout->ensureCyphtVendorBridge()) {
+		fwrite(STDERR, $vendorLayout->error."\n");
+		exit(1);
+	}
+	if (!$installer->installAll()) {
+		fwrite(STDERR, $installer->error."\n");
+		exit(1);
+	}
+	cyphtSay("installed: ".implode(', ', $installer->listModuleSets())."\n", $options['quiet']);
+
+	if (!$patches->patchCoreFunctionsGuard()) {
+		fwrite(STDERR, $patches->error."\n");
+		exit(1);
+	}
+}
+
+/* A build on a fresh clone has nothing under vendor/ yet, and the offline
+ * branch below reads .env.example out of the Cypht package before compiling.
+ * Conditional because runConfigGen() fetches dependencies itself, so on an
+ * already-populated tree this would be the second composer run of the build. */
+if (!is_dir($root.'/vendor/jason-munro/cypht')) {
+	cyphtPrepare($root, $options, $vendorLayout, $installer, $patches);
 }
 
 /*
@@ -349,9 +374,7 @@ if ($masterIncPath === '') {
 	$offline = new CyphtPipeline(null, $paths, null, $vendorLayout, null, $patches, $installer);
 
 	/* runConfigGen() is the whole three step pipeline, composer then
-	 * config_gen then publish, so there is no separate publish call here. It
-	 * re-runs composer over the tree step 1 already installed, which is a
-	 * no-op in practice. */
+	 * config_gen then publish, so there is no separate publish call here. */
 	$genResult = $offline->runConfigGen(function ($chunk) use ($options) {
 		cyphtSay($chunk, $options['quiet']);
 	});
@@ -463,7 +486,9 @@ if ($options['permissions']) {
 	}
 }
 
-cyphtSay("\nBuild complete. Cypht ".$webmail->getInstalledVersion()." is live.\n", $options['quiet']);
+/* No closing banner here: runConfigGen() already reported the build and the
+ * version it produced, and repeating it verbatim after the permissions line
+ * read like the build had run twice. */
 
 $db->close();
 exit(0);
