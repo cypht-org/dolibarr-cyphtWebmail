@@ -79,39 +79,149 @@ class CyphtVendorLayout
 			return false;
 		}
 
-		// Same flat-dependency problem as autoload.php above, but for the raw
-		// asset directories (Bootstrap, Bootswatch) config_gen.php reads off
-		// disk. Rebuilt only when the installed versions change: copying them
-		// takes minutes and overruns the request.
+		return $this->mirrorVendorAssets($bridgeDir);
+	}
+
+	/**
+	 * Everything Cypht reads from VENDOR_PATH off disk rather than through
+	 * the autoloader.
+	 *
+	 * Globs, not whole packages: twbs and thomaspark together are 150MB, of
+	 * which this is about 6.5MB. Sourced from config_gen.php (lines 482, 556,
+	 * 616, 618), lib/js_libs.php (JS_LIBS, resolved against APP_PATH) and
+	 * modules/developer/modules.php:36. Grep VENDOR_PATH and JS_LIBS after a
+	 * Cypht upgrade; a path added upstream shows up here as a build failure.
+	 *
+	 * @return array<string,string[]> Composer vendor namespace => path globs
+	 */
+	private function assetManifest()
+	{
+		return array(
+			'twbs' => array(
+				'bootstrap/dist/css/bootstrap.min.css',
+				// Cypht's own JS is inert without it: Bootstrap drives the
+				// dropdowns and the modals Hm_Modal builds on.
+				'bootstrap/dist/js/bootstrap.bundle.min.js',
+				'bootstrap-icons/font/bootstrap-icons.css',
+				'bootstrap-icons/font/fonts/*',
+			),
+			'thomaspark' => array(
+				'bootswatch/dist/*/bootstrap.min.css',
+			),
+			// Read by the developer module, which falls back to shelling out
+			// to git when it is missing.
+			'composer' => array(
+				'installed.json',
+			),
+		);
+	}
+
+	/**
+	 * Put those assets where Cypht's scripts expect them.
+	 *
+	 * Copies rather than links. A symlink needs privileges Windows withholds
+	 * from Apache, a junction needs exec(), and neither survives being zipped
+	 * for release; all three used to fall through to a silent miss, leaving a
+	 * build with no Bootstrap in it. Failure is reported here instead, since
+	 * the resulting site renders unstyled and the cause is not obvious from
+	 * looking at it.
+	 *
+	 * @param string $bridgeDir vendor/ inside the Cypht package
+	 * @return bool
+	 */
+	private function mirrorVendorAssets($bridgeDir)
+	{
 		$moduleVendor = $this->paths->getModuleRoot() . '/vendor';
-		foreach (array('twbs', 'thomaspark') as $vendor) {
-			$target = $moduleVendor . '/' . $vendor;
-			$link = $bridgeDir . '/' . $vendor;
+
+		foreach ($this->assetManifest() as $vendor => $globs) {
+			$source = $moduleVendor . '/' . $vendor;
+			$dest = $bridgeDir . '/' . $vendor;
 			$marker = $bridgeDir . '/.' . $vendor . '.bridged';
 
-			if (!is_dir($target)) {
-				continue; // not installed, nothing to bridge
+			if (!is_dir($source)) {
+				continue;
 			}
 
 			$fingerprint = $this->bridgeFingerprint($vendor);
-			if ($fingerprint !== '' && is_dir($link) && @file_get_contents($marker) === $fingerprint) {
-				continue; // already bridged at this exact version
+			if ($fingerprint !== '' && @file_get_contents($marker) === $fingerprint
+				&& $this->assetsPresent($source, $dest, $globs)) {
+				continue;
 			}
 
-			$this->unbridge($link);
+			// Older builds left a symlink, a junction or a full copy here.
+			$this->unbridge($dest);
 
-			$linked = @symlink($target, $link);
-			if (!$linked) {
-				$linked = $this->makeJunction($target, $link);
+			$copied = 0;
+			foreach ($globs as $glob) {
+				foreach ((array) glob($source . '/' . $glob) as $file) {
+					if (!is_file($file)) {
+						continue;
+					}
+					$relative = substr($file, strlen($source) + 1);
+					if ($this->copyFile($file, $dest . '/' . $relative)) {
+						$copied++;
+					}
+				}
 			}
-			if (!$linked) {
-				$this->copyRecursive($target, $link);
+
+			if (!$this->assetsPresent($source, $dest, $globs)) {
+				$this->error = 'Could not mirror ' . $vendor . ' assets into ' . $dest .
+					' (' . $copied . ' file(s) copied). Cypht builds its stylesheet from these, ' .
+					'so the site would come out unstyled. Check permissions on ' . $bridgeDir . '.';
+				return false;
 			}
 
 			@file_put_contents($marker, $fingerprint);
 		}
 
 		return true;
+	}
+
+	/**
+	 * True when every file the globs match in the source has a counterpart in
+	 * the destination. Also the post-copy check, so a partial copy is a
+	 * failure rather than a half-styled build.
+	 *
+	 * @param string $source
+	 * @param string $dest
+	 * @param string[] $globs
+	 * @return bool
+	 */
+	private function assetsPresent($source, $dest, array $globs)
+	{
+		foreach ($globs as $glob) {
+			$matches = glob($source . '/' . $glob);
+			if (!is_array($matches) || count($matches) === 0) {
+				continue;
+			}
+			foreach ($matches as $file) {
+				if (!is_file($file)) {
+					continue;
+				}
+				if (!is_file($dest . '/' . substr($file, strlen($source) + 1))) {
+					return false;
+				}
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Copy one file, creating its parent directories.
+	 *
+	 * @param string $src
+	 * @param string $dst
+	 * @return bool
+	 */
+	private function copyFile($src, $dst)
+	{
+		$dir = dirname($dst);
+		if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
+			return false;
+		}
+
+		return @copy($src, $dst);
 	}
 
 	/**
@@ -141,7 +251,10 @@ class CyphtVendorLayout
 			}
 		}
 		if (count($parts) === 0) {
-			return '';
+			/* "composer" is a directory Composer writes, not a package it
+			 * lists, so nothing matches the namespace. Hash the file instead
+			 * of giving up, or that entry re-copies on every build. */
+			return md5_file($installedJson);
 		}
 		sort($parts);
 
@@ -149,7 +262,8 @@ class CyphtVendorLayout
 	}
 
 	/**
-	 * Remove an existing bridge entry.
+	 * Remove a previous bridge entry, which older builds may have left as a
+	 * symlink or a junction rather than a directory.
 	 *
 	 * rmdir() is tried before deleteRecursive() because a Windows junction
 	 * looks like a directory to is_dir() and PHP does not reliably report it
@@ -174,29 +288,6 @@ class CyphtVendorLayout
 				$this->deleteRecursive($link);
 			}
 		}
-	}
-
-	/**
-	 * Windows directory junction, which unlike a symlink needs no elevation.
-	 *
-	 * @param string $target
-	 * @param string $link
-	 * @return bool
-	 */
-	private function makeJunction($target, $link)
-	{
-		if (DIRECTORY_SEPARATOR !== '\\' || !function_exists('exec')) {
-			return false;
-		}
-
-		$cmd = 'mklink /J ' . escapeshellarg(str_replace('/', '\\', $link)) .
-			' ' . escapeshellarg(str_replace('/', '\\', $target));
-
-		$output = array();
-		$code = 1;
-		@exec('cmd /c ' . $cmd . ' 2>&1', $output, $code);
-
-		return $code === 0 && is_dir($link);
 	}
 
 	/**
