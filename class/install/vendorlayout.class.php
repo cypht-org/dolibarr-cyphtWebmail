@@ -20,12 +20,9 @@ require_once __DIR__ . '/../install/paths.class.php';
 /**
  * \file        class/install/vendorlayout.class.php
  * \ingroup     cyphtWebmail
- * \brief       Bridges Cypht's flat-Composer-dependency layout (installed
- *              as a direct dependency of this module, same as Tiki does)
- *              against Cypht's own scripts, which expect a nested vendor/
- *              inside their own package directory. Also home to the
- *              generic recursive copy/delete helpers, also used by
- *              CyphtPipeline::publishSite().
+ * \brief       Bridges Cypht's flat-Composer layout against its own scripts,
+ *              which expect a nested vendor/. Also home to the recursive
+ *              copy/delete helpers CyphtPipeline::publishSite() uses.
  */
 class CyphtVendorLayout
 {
@@ -48,13 +45,10 @@ class CyphtVendorLayout
 	}
 
 	/**
-	 * Cypht's own scripts expect a nested vendor/autoload.php inside their
-	 * own package directory, since they're written for a standalone Cypht
-	 * checkout. We install Cypht as a flat dependency instead (same as
-	 * Tiki), so there is no nested vendor/ there. This creates a shim at
-	 * the path Cypht expects, forwarding to the real shared autoloader.
-	 * Must be re-created on every build: Composer re-extracts a package's
-	 * directory whenever its locked version changes.
+	 * Cypht's scripts expect a nested vendor/autoload.php in their own package
+	 * directory; installed flat, there is none. Shims the path they expect.
+	 * Re-created every build, since Composer re-extracts the package whenever
+	 * its locked version changes.
 	 *
 	 * @return bool
 	 */
@@ -86,11 +80,9 @@ class CyphtVendorLayout
 	 * Everything Cypht reads from VENDOR_PATH off disk rather than through
 	 * the autoloader.
 	 *
-	 * Globs, not whole packages: twbs and thomaspark together are 150MB, of
-	 * which this is about 6.5MB. Sourced from config_gen.php (lines 482, 556,
-	 * 616, 618), lib/js_libs.php (JS_LIBS, resolved against APP_PATH) and
-	 * modules/developer/modules.php:36. Grep VENDOR_PATH and JS_LIBS after a
-	 * Cypht upgrade; a path added upstream shows up here as a build failure.
+	 * Globs, not whole packages: 6.5MB of 150MB. From config_gen.php 482, 556,
+	 * 616, 618, lib/js_libs.php JS_LIBS and developer/modules.php:36. Regrep
+	 * VENDOR_PATH and JS_LIBS after a Cypht upgrade.
 	 *
 	 * @return array<string,string[]> Composer vendor namespace => path globs
 	 */
@@ -119,12 +111,9 @@ class CyphtVendorLayout
 	/**
 	 * Put those assets where Cypht's scripts expect them.
 	 *
-	 * Copies rather than links. A symlink needs privileges Windows withholds
-	 * from Apache, a junction needs exec(), and neither survives being zipped
-	 * for release; all three used to fall through to a silent miss, leaving a
-	 * build with no Bootstrap in it. Failure is reported here instead, since
-	 * the resulting site renders unstyled and the cause is not obvious from
-	 * looking at it.
+	 * Copies, not links: a symlink needs privileges Windows withholds from
+	 * Apache, a junction needs exec(), and neither survives being zipped.
+	 * Failure is fatal here because the site just renders unstyled.
 	 *
 	 * @param string $bridgeDir vendor/ inside the Cypht package
 	 * @return bool
@@ -264,21 +253,14 @@ class CyphtVendorLayout
 	}
 
 	/**
-	 * Clear whatever an older build left at this path and hand back an empty
-	 * directory: a real directory, a symlink, or a Windows junction.
+	 * Clear a real directory, symlink or Windows junction and hand back an
+	 * empty directory.
 	 *
-	 * Nothing here asks what is at the path first, because on Windows nothing
-	 * answers reliably. A junction whose target is gone is invisible to
-	 * is_dir(), file_exists() and even lstat(), while still holding the name,
-	 * so every probe reports a free path that mkdir() then fails on with
-	 * ENOENT. Each removal runs unconditionally instead, and success is
-	 * decided by whether the directory can actually be created afterwards.
-	 *
-	 * unlink() before rmdir() before deleteRecursive(): unlink clears a file
-	 * symlink, rmdir clears a junction or directory symlink without following
-	 * it, and only a real populated directory is ever walked. Walking a
-	 * junction would delete the Bootstrap files it points at. All three are
-	 * no-ops on a name that is genuinely free.
+	 * Removals run unconditionally, and success is whether mkdir() then works:
+	 * a dangling junction is invisible to is_dir(), file_exists() and lstat()
+	 * while still holding the name, so probing first is useless. Order matters,
+	 * rmdir clears a junction without following it; deleteRecursive would walk
+	 * one and delete the Bootstrap files it points at.
 	 *
 	 * @param string $dir
 	 * @return bool
