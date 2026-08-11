@@ -121,6 +121,41 @@ class CyphtPaths
 	}
 
 	/**
+	 * Record what this tree contains, at the module root. 
+	 *
+	 * @param string|null $cyphtVersion Defaults to what Composer reports
+	 * @return void
+	 */
+	public function writeBuildInfo($cyphtVersion = null)
+	{
+		$root = $this->getModuleRoot();
+
+		if ($cyphtVersion === null) {
+			$cyphtVersion = $this->getInstalledVersion();
+		}
+
+		$moduleVersion = null;
+		$descriptor = $root . '/core/modules/modcyphtWebmail.class.php';
+		if (is_readable($descriptor)) {
+			$source = file_get_contents($descriptor);
+			if ($source !== false && preg_match("/\\\$this->version\s*=\s*'([^']+)'/", $source, $m)) {
+				$moduleVersion = $m[1];
+			}
+		}
+
+		$info = array(
+			'module_version' => $moduleVersion,
+			'cypht_version' => $cyphtVersion,
+			'built_at' => gmdate('c'),
+		);
+
+		@file_put_contents(
+			$root . '/build.json',
+			json_encode($info, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n"
+		);
+	}
+
+	/**
 	 * Read jason-munro/cypht's installed version straight from Composer's
 	 * own installed.json, so this always reflects whatever is actually on
 	 * disk (post composer update) rather than something we cached earlier.
@@ -199,10 +234,9 @@ class CyphtPaths
 	/**
 	 * Filesystem path of a user's Cypht settings file.
 	 *
-	 * MUST stay in step with Custom_User_Config::get_path() in the generated
-	 * modules/site/lib.php: Cypht writes the file, Dolibarr deletes it,
-	 * neither can see the other's code. The sha256 fragment is what stops
-	 * "jean dupont" and "jean_dupont" sharing one file.
+	 * MUST match Custom_User_Config::get_path() in the generated
+	 * modules/site/lib.php: Cypht writes the file, Dolibarr deletes it. The
+	 * sha256 fragment stops "jean dupont" and "jean_dupont" colliding.
 	 *
 	 * @param string $login Dolibarr login
 	 * @return string
