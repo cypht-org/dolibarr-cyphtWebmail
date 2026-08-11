@@ -45,9 +45,8 @@ class CyphtEnvBootstrap
 	}
 
 	/**
-	 * Hm_Environment::get() reads array_merge($_ENV, $_SERVER) on every call,
-	 * so populating $_ENV before Cypht loads its config replaces the .env
-	 * write. Existing values win, so a real .env entry stays an override.
+	 * Populating the environment before Cypht loads its config replaces the
+	 * .env write. Existing values win, so a real .env entry stays an override.
 	 *
 	 * @return bool True if the per-installation values are now available
 	 */
@@ -82,10 +81,23 @@ class CyphtEnvBootstrap
 			if ($value === null || $value === '') {
 				continue;
 			}
+
 			if (array_key_exists($key, $_ENV) && $_ENV[$key] !== '') {
-				continue;
+				$value = $_ENV[$key];
+			} else {
+				$_ENV[$key] = (string) $value;
 			}
-			$_ENV[$key] = (string) $value;
+
+			/* Both stores, because Cypht reads from both and they are not
+			 * kept in sync for us. Hm_Environment::get() reads $_ENV;
+			 * config/app.php resolves 125 settings through env(), which is
+			 * getenv() only. Symfony's loader normally putenv()s what it
+			 * parses out of .env, but it skips any name already in $_ENV, so
+			 * writing $_ENV alone leaves getenv() empty and every one of
+			 * those settings silently falls back to its upstream default. */
+			if (getenv($key) === false) {
+				putenv($key . '=' . $value);
+			}
 		}
 
 		return $consts !== null;
