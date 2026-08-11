@@ -88,7 +88,7 @@ class CyphtMailTemplateSource
 			return $url;
 		}
 
-		return dol_buildpath('/cyphtWebmail/bridge/mail_templates.php', 2);
+		return dol_buildpath('/cyphtwebmail/bridge/mail_templates.php', 2);
 	}
 
 }
