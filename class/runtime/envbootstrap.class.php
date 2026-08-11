@@ -88,13 +88,10 @@ class CyphtEnvBootstrap
 				$_ENV[$key] = (string) $value;
 			}
 
-			/* Both stores, because Cypht reads from both and they are not
-			 * kept in sync for us. Hm_Environment::get() reads $_ENV;
-			 * config/app.php resolves 125 settings through env(), which is
-			 * getenv() only. Symfony's loader normally putenv()s what it
-			 * parses out of .env, but it skips any name already in $_ENV, so
-			 * writing $_ENV alone leaves getenv() empty and every one of
-			 * those settings silently falls back to its upstream default. */
+			/* Both stores: Hm_Environment::get() reads $_ENV, but config/app.php
+			 * resolves 125 settings through env(), which is getenv() only.
+			 * Symfony's loader skips any name already in $_ENV, so it never
+			 * putenv()s these and they would fall back to upstream defaults. */
 			if (getenv($key) === false) {
 				putenv($key . '=' . $value);
 			}
@@ -165,14 +162,18 @@ class CyphtEnvBootstrap
 			'prefix' => $dolibarr_main_db_prefix !== '' ? $dolibarr_main_db_prefix : 'llx_',
 			'data_root' => $dolibarr_main_data_root,
 			'url_root' => rtrim($dolibarr_main_url_root, '/'),
+			// conf.php sits at <web root>/conf/conf.php, so this is the
+			// directory url_root actually points at.
+			'root_dir' => dirname(dirname($path)),
 		);
 	}
 
 	/**
-	 * The normal layout is <dolibarr>/htdocs/custom/<module>, so conf.php is
-	 * two directories above the module. The environment override exists for
-	 * installations that put the module somewhere else entirely, which the
-	 * module already supports for building.
+	 * Walk up from the module looking for Dolibarr's conf.php.
+	 *
+	 * Every ancestor, not a fixed depth: htdocs/custom/<module> is only the
+	 * convention. CYPHTWEBMAIL_DOLIBARR_CONF wins, for a Dolibarr that is not
+	 * an ancestor at all.
 	 *
 	 * @return string|null
 	 */
@@ -183,19 +184,22 @@ class CyphtEnvBootstrap
 			return $override;
 		}
 
-		$candidates = array(
-			dirname($this->moduleRoot, 2) . '/conf/conf.php',
-			dirname($this->moduleRoot, 3) . '/htdocs/conf/conf.php',
-			dirname($this->moduleRoot) . '/conf/conf.php',
-		);
+		$dir = $this->moduleRoot;
 
-		foreach ($candidates as $candidate) {
-			if (is_readable($candidate)) {
-				return $candidate;
+		while (true) {
+			foreach (array($dir . '/conf/conf.php', $dir . '/htdocs/conf/conf.php') as $candidate) {
+				if (is_readable($candidate)) {
+					return $candidate;
+				}
 			}
-		}
 
-		return null;
+			// dirname() is its own parent at the filesystem root, on both platforms.
+			$parent = dirname($dir);
+			if ($parent === $dir) {
+				return null;
+			}
+			$dir = $parent;
+		}
 	}
 
 	/**
@@ -210,7 +214,7 @@ class CyphtEnvBootstrap
 	private function fromConf(array $conf)
 	{
 		$dataDir = rtrim($conf['data_root'], '/\\') . '/cyphtwebmail';
-		$moduleUrl = $conf['url_root'] . '/custom/cyphtwebmail';
+		$moduleUrl = $conf['url_root'] . $this->moduleUrlPath($conf['root_dir']);
 
 		return array(
 			'DB_DRIVER' => ($conf['type'] === 'pgsql') ? 'pgsql' : 'mysql',
@@ -226,6 +230,33 @@ class CyphtEnvBootstrap
 			'DOLIBARR_MAIL_TEMPLATES_URL' => $moduleUrl . '/bridge/mail_templates.php',
 			'DOLIBARR_NEW_CONTACT_URL' => $conf['url_root'] . '/contact/card.php?action=create',
 		);
+	}
+
+	/**
+	 * Where the module sits under the Dolibarr web root, as a URL path.
+	 *
+	 * Measured, not assumed to be custom/<module>: a wrong path here is a 404
+	 * on the bridges that reads like a signature fault. Case-insensitive on
+	 * Windows. Falls back to the conventional location for a module symlinked
+	 * in, which has no path under the web root to measure.
+	 *
+	 * @param string $rootDir Directory url_root points at
+	 * @return string Leading slash, no trailing slash
+	 */
+	private function moduleUrlPath($rootDir)
+	{
+		$root = rtrim(str_replace('\\', '/', $rootDir), '/');
+		$module = rtrim(str_replace('\\', '/', $this->moduleRoot), '/');
+
+		$inside = (DIRECTORY_SEPARATOR === '\\')
+			? stripos($module, $root . '/') === 0
+			: strpos($module, $root . '/') === 0;
+
+		if ($root !== '' && $inside) {
+			return substr($module, strlen($root));
+		}
+
+		return '/custom/' . basename($module);
 	}
 
 	/**
