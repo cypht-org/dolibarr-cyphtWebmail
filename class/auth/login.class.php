@@ -52,16 +52,12 @@ class CyphtLogin
 	}
 
 	/**
-	 * Logs the given Dolibarr user into Cypht via its "functional login"
-	 * SSO option (calls cypht_login() in-process, setting the
-	 * hm_id/hm_session cookies). Must be called before any HTML output.
+	 * Log the Dolibarr user into Cypht in-process via cypht_login(), which
+	 * sets the hm_id/hm_session cookies. Must run before any HTML output.
 	 *
-	 * Skips the login entirely if a live session already exists for this
-	 * user (see hasLiveSsoSession()): index.php calls this on
-	 * every page load, and cypht_login() always resets the session data,
-	 * which was silently discarding settings/servers that Cypht hadn't
-	 * yet flagged for permanent storage. Requests made inside the iframe
-	 * reuse the existing session cookie and never hit this path.
+	 * Skipped when hasLiveSsoSession() finds one: index.php calls this every
+	 * page load and cypht_login() resets the session data, which discarded
+	 * settings Cypht had not yet flagged for permanent storage.
 	 *
 	 * @param string $login Dolibarr username to log into Cypht as
 	 * @param string $cyphtUrl URL of the published Cypht app, need not be
@@ -98,15 +94,12 @@ class CyphtLogin
 	}
 
 	/**
-	 * Give the Cypht code we are about to load the same configuration the
-	 * published entry point runs with.
+	 * Give the Cypht code loaded below the same configuration public/index.php
+	 * runs with.
 	 *
-	 * modules/api_login/api.php bootstraps Cypht itself, reaching only the
-	 * .env file. Since the per-installation values moved into the database,
-	 * .env no longer carries SSO_SHARED_SECRET, so Custom_Auth compared the
-	 * token against an empty secret and refused every login. The same
-	 * bootstrap public/index.php uses is run here so the side that signs the
-	 * token and the side that verifies it cannot read different values.
+	 * api_login/api.php bootstraps Cypht itself and reaches only .env, which no
+	 * longer carries SSO_SHARED_SECRET, so Custom_Auth checked the token against
+	 * an empty secret and refused every login.
 	 *
 	 * @return bool
 	 */
@@ -120,14 +113,11 @@ class CyphtLogin
 			return false;
 		}
 
-		/* api.php defines APP_PATH and VENDOR_PATH but not SITE_ID, which
-		 * feeds Hm_Request_Key's fingerprint. Left undefined, the session
-		 * minted here is fingerprinted differently from the one the iframe
-		 * validates against, and the login is rejected on the next request.
-		 *
-		 * Minted here if provisioning has not run, rather than left empty:
-		 * the published index.php falls back to the value baked at build
-		 * time, which this process has no way to see. */
+		/* api.php leaves SITE_ID undefined, and it feeds Hm_Request_Key's
+		 * fingerprint: without it this session is fingerprinted differently
+		 * from the one the iframe validates. Minted rather than left empty,
+		 * since index.php falls back to a baked value this process cannot
+		 * see. */
 		if (!defined('SITE_ID')) {
 			$siteId = empty($_ENV['CYPHT_SITE_ID'])
 				? $this->token->getOrCreateSiteId()
@@ -154,10 +144,8 @@ class CyphtLogin
 	}
 
 	/**
-	 * True if this browser already has a valid, still-on-disk Cypht
-	 * session for $login: our own login-tracking cookie matches, Cypht's
-	 * own hm_session cookie is set, and the session file it names still
-	 * exists on disk.
+	 * True when our login cookie matches, Cypht's hm_session cookie is set,
+	 * and the session file it names is still on disk.
 	 *
 	 * @param string $login
 	 * @return bool
@@ -203,9 +191,8 @@ class CyphtLogin
 	}
 
 	/**
-	 * cypht_login() needs a real absolute URL to work out the cookie
-	 * domain; dol_buildpath() can return a host-relative one. Prepends
-	 * the current request's scheme+host if $url doesn't have one already.
+	 * cypht_login() needs an absolute URL for the cookie domain, and
+	 * dol_buildpath() can return a host-relative one.
 	 *
 	 * @param string $url
 	 * @return string
