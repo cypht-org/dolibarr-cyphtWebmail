@@ -471,9 +471,18 @@ var dolibarr_mail_templates_open = function(strings) {
 
 var dolibarr_mail_templates_init = function() {
     var root = document.getElementById('dolibarr_mail_templates_picker');
-    if (!root) {
+    var toggle = document.getElementById('dolibarr_mail_template_toggle');
+    if (!root || !toggle) {
         return; /* not the compose page, or nothing to show */
     }
+
+    /* Both entry points below can fire against one render, and the listeners
+     * would stack. The flag lives on the button, so a page swap that brings a
+     * fresh one starts clean. */
+    if (toggle.getAttribute('data-dolibarr-bound') === '1') {
+        return;
+    }
+    toggle.setAttribute('data-dolibarr-bound', '1');
 
     /* The output module has to render last, or it splits Cypht's button row,
      * so move it under the message box here. Guarded at every step: an
@@ -488,10 +497,6 @@ var dolibarr_mail_templates_init = function() {
     }
 
     var strings = dolibarr_mail_templates_strings(root);
-    var toggle = document.getElementById('dolibarr_mail_template_toggle');
-    if (!toggle) {
-        return;
-    }
 
     toggle.addEventListener('click', function() {
         dolibarr_mail_templates_hide_undo();
@@ -502,6 +507,28 @@ var dolibarr_mail_templates_init = function() {
     if (undoBtn) {
         undoBtn.addEventListener('click', dolibarr_mail_templates_undo);
     }
+};
+
+/* Two entry points, because there are two ways to arrive at compose.
+ *
+ * A full page load fires document ready. An in-app navigation does not: it
+ * swaps #cypht-main and calls the route handler registered for the page,
+ * within the same document, so ready never fires a second time. Relying on
+ * ready alone left the picker wherever the output module had rendered it, at
+ * the end of the form, with nothing bound to its button.
+ *
+ * Wrapping is safe this early: routes.js resolves handler names off window
+ * when it builds ROUTES, and config_gen appends the navigation files after
+ * every module, so this replacement is what gets registered. */
+var dolibarr_mail_templates_compose_handler = window.applyComposePageHandlers;
+window.applyComposePageHandlers = function(routeParams) {
+    var unmount = dolibarr_mail_templates_compose_handler
+        ? dolibarr_mail_templates_compose_handler(routeParams)
+        : undefined;
+
+    dolibarr_mail_templates_init();
+
+    return unmount;
 };
 
 $(document).ready(function() {
