@@ -149,7 +149,9 @@ class CyphtVendorLayout
 			}
 
 			// Older builds left a symlink, a junction or a full copy here.
-			$this->unbridge($dest);
+			if (!$this->resetDir($dest)) {
+				return false;
+			}
 
 			$copied = 0;
 			foreach ($globs as $glob) {
@@ -262,32 +264,40 @@ class CyphtVendorLayout
 	}
 
 	/**
-	 * Remove a previous bridge entry, which older builds may have left as a
-	 * symlink or a junction rather than a directory.
+	 * Clear whatever an older build left at this path and hand back an empty
+	 * directory: a real directory, a symlink, or a Windows junction.
 	 *
-	 * rmdir() is tried before deleteRecursive() because a Windows junction
-	 * looks like a directory to is_dir() and PHP does not reliably report it
-	 * via is_link(); rmdir() removes the junction and leaves its target
-	 * alone, while deleteRecursive() would follow it and delete the real
-	 * Bootstrap files.
+	 * Nothing here asks what is at the path first, because on Windows nothing
+	 * answers reliably. A junction whose target is gone is invisible to
+	 * is_dir(), file_exists() and even lstat(), while still holding the name,
+	 * so every probe reports a free path that mkdir() then fails on with
+	 * ENOENT. Each removal runs unconditionally instead, and success is
+	 * decided by whether the directory can actually be created afterwards.
 	 *
-	 * @param string $link
-	 * @return void
+	 * unlink() before rmdir() before deleteRecursive(): unlink clears a file
+	 * symlink, rmdir clears a junction or directory symlink without following
+	 * it, and only a real populated directory is ever walked. Walking a
+	 * junction would delete the Bootstrap files it points at. All three are
+	 * no-ops on a name that is genuinely free.
+	 *
+	 * @param string $dir
+	 * @return bool
 	 */
-	private function unbridge($link)
+	private function resetDir($dir)
 	{
-		if (is_link($link)) {
-			if (!@unlink($link)) {
-				@rmdir($link);
-			}
-			return;
+		if (!@unlink($dir) && !@rmdir($dir) && is_dir($dir)) {
+			$this->deleteRecursive($dir);
 		}
 
-		if (is_dir($link)) {
-			if (!@rmdir($link)) {
-				$this->deleteRecursive($link);
-			}
+		clearstatcache(true, $dir);
+
+		if (!@mkdir($dir, 0755, true) && !is_dir($dir)) {
+			$this->error = 'Could not clear ' . $dir . ', left behind by an earlier ' .
+				'build. Delete it by hand and build again.';
+			return false;
 		}
+
+		return true;
 	}
 
 	/**
