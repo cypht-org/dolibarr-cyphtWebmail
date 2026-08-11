@@ -81,6 +81,10 @@ class CyphtLogin
 			return false;
 		}
 
+		if (!$this->prepareCyphtEnvironment()) {
+			return false;
+		}
+
 		require_once $apiFile;
 
 		$token = $this->token->generateSsoLoginToken($login);
@@ -91,6 +95,51 @@ class CyphtLogin
 		}
 
 		return $ok;
+	}
+
+	/**
+	 * Give the Cypht code we are about to load the same configuration the
+	 * published entry point runs with.
+	 *
+	 * modules/api_login/api.php bootstraps Cypht itself, reaching only the
+	 * .env file. Since the per-installation values moved into the database,
+	 * .env no longer carries SSO_SHARED_SECRET, so Custom_Auth compared the
+	 * token against an empty secret and refused every login. The same
+	 * bootstrap public/index.php uses is run here so the side that signs the
+	 * token and the side that verifies it cannot read different values.
+	 *
+	 * @return bool
+	 */
+	private function prepareCyphtEnvironment()
+	{
+		require_once __DIR__ . '/../runtime/envbootstrap.class.php';
+
+		$bootstrap = new CyphtEnvBootstrap($this->paths->getModuleRoot());
+		if (!$bootstrap->apply()) {
+			$this->error = 'Could not load the webmail configuration: ' . $bootstrap->error;
+			return false;
+		}
+
+		/* api.php defines APP_PATH and VENDOR_PATH but not SITE_ID, which
+		 * feeds Hm_Request_Key's fingerprint. Left undefined, the session
+		 * minted here is fingerprinted differently from the one the iframe
+		 * validates against, and the login is rejected on the next request.
+		 *
+		 * Minted here if provisioning has not run, rather than left empty:
+		 * the published index.php falls back to the value baked at build
+		 * time, which this process has no way to see. */
+		if (!defined('SITE_ID')) {
+			$siteId = empty($_ENV['CYPHT_SITE_ID'])
+				? $this->token->getOrCreateSiteId()
+				: $_ENV['CYPHT_SITE_ID'];
+
+			if ($siteId !== '') {
+				$_ENV['CYPHT_SITE_ID'] = $siteId;
+				define('SITE_ID', $siteId);
+			}
+		}
+
+		return true;
 	}
 
 	/**
