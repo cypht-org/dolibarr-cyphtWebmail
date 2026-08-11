@@ -90,7 +90,7 @@ class CyphtPaths
 			return $dir;
 		}
 
-		$dir = DOL_DATA_ROOT . '/cyphtWebmail';
+		$dir = DOL_DATA_ROOT . '/cyphtwebmail';
 
 		require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
 		dol_mkdir($dir . '/users');
