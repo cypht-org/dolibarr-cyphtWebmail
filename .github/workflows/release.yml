@@ -1,0 +1,60 @@
+name: Release
+
+# Pushing a tag is the whole release. The tag only triggers and labels; the
+# version itself comes from version.inc.php, and the job refuses to build if
+# the two disagree.
+on:
+  push:
+    tags:
+      - '[0-9]*'
+      - 'v[0-9]*'
+
+permissions:
+  contents: write          # needed to create the release and attach the archive
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          # zip for ZipArchive, the rest are what Cypht's config_gen touches
+          # while compiling.
+          extensions: zip, mbstring, dom, curl, openssl
+
+      - name: Check the tag matches version.inc.php
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          src=$(php -r 'require "version.inc.php"; echo CYPHTWEBMAIL_VERSION;')
+          echo "tag=$tag  version.inc.php=$src"
+          if [ "$tag" != "$src" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match CYPHTWEBMAIL_VERSION ($src). Bump version.inc.php, or retag."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress
+
+      - name: Build the release archive
+        run: php build/buildzip.php --out=dist
+
+      # buildzip already refuses to emit an archive that fails its own checks,
+      # so reaching here means the prune, the layout and the .env were all
+      # verified. This only surfaces what was produced.
+      - name: Show what was built
+        run: |
+          ls -lh dist/
+          sha256sum dist/*.zip | tee dist/SHA256SUMS
+
+      - name: Attach it to the release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            dist/*.zip
+            dist/SHA256SUMS
+          generate_release_notes: true
