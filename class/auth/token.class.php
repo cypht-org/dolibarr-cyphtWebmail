@@ -87,6 +87,10 @@ class CyphtToken
 
 		$secret = CyphtConfig::get($this->db, 'USER_CONFIG_SECRET', '');
 		if ($secret !== '') {
+			/* Never re-mint: this encrypts every mailbox password in
+			 * llx_cyphtwebmail_userconfig, and replacing it fails silently
+			 * rather than loudly. Rotating it means re-encrypting every
+			 * stored config in the same transaction. */
 			return $secret;
 		}
 
@@ -99,18 +103,11 @@ class CyphtToken
 	}
 
 	/**
-	 * Cypht's per-site identifier.
+	 * Per-installation SITE_ID.
 	 *
-	 * Cypht's own build bakes this into the compiled entry point as a literal,
-	 * which is fine when every installation compiles for itself and wrong the
-	 * moment a build is shipped: every install would share one value.
-	 * Hm_Crypt feeds SITE_ID into build_fingerprint() alongside the username
-	 * and request key (lib/crypt.php), so a shared value is a shared input to
-	 * request key derivation, not a cosmetic id.
-	 *
-	 * Generated here like the other two and read back at runtime, so a
-	 * distributed build stays distributable and each install still gets its
-	 * own.
+	 * Cypht bakes this into the compiled entry point, so a shipped build would
+	 * share one value across every install. It feeds build_fingerprint() in
+	 * lib/crypt.php, so that is a shared input to request key derivation.
 	 *
 	 * @return string
 	 */

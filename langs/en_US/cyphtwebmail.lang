@@ -85,3 +85,8 @@ CyphtWebmailRebuildFromShell=Cypht is built and running. This server cannot rebu
 # compiles anything.
 CyphtWebmailMaintenance = Maintenance
 CyphtWebmailMaintenanceHint = Developer tools. Releases ship already compiled, so rebuilding is only needed after changing anything under cypht/modules/.
+
+# Version reporting. build.json is written by the build and ships with it, so
+# it is the only source a prebuilt release has for these.
+CyphtWebmailModuleVersion = Module version
+CyphtWebmailVersionMismatch = built against %s, but %s is installed. Rebuild, or reinstall the release.

@@ -24,9 +24,9 @@ require_once __DIR__ . '/../install/paths.class.php';
  *              exposes Dolibarr third parties and contacts to Cypht as a
  *              read-only contact source.
  *
- *              The module set itself lives in templates/dolibarr_contacts
- *              and is copied into vendor/jason-munro/cypht on every build,
- *              so a "composer update" cannot silently revert it.
+ *              Source lives in cypht/modules/dolibarr_contacts and is copied
+ *              into vendor/jason-munro/cypht on every build, so a "composer
+ *              update" cannot silently revert it.
  */
 class CyphtContactSource
 {
@@ -86,7 +86,7 @@ class CyphtContactSource
 			return $url;
 		}
 
-		return dol_buildpath('/cyphtWebmail/bridge/contacts.php', 2);
+		return dol_buildpath('/cyphtwebmail/bridge/contacts.php', 2);
 	}
 
 }

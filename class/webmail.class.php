@@ -177,6 +177,12 @@ class CyphtWebmail
 		return $this->paths->getInstalledVersion();
 	}
 
+	/** @return array<string,string>|null */
+	public function getBuildInfo()
+	{
+		return $this->paths->getBuildInfo();
+	}
+
 	/** @return string */
 	public function getBuiltVersion()
 	{

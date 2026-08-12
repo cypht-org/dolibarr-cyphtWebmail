@@ -157,8 +157,8 @@ class modcyphtWebmail extends DolibarrModules
 		);
 
 		// Data directories to create when module is enabled.
-		// Example: this->dirs = array("/cyphtWebmail/temp","/cyphtWebmail/subdir");
-		$this->dirs = array("/cyphtWebmail/temp");
+		// Example: this->dirs = array("/cyphtwebmail/temp","/cyphtWebmail/subdir");
+		$this->dirs = array("/cyphtwebmail/temp");
 
 		// Config pages. Put here list of php page, stored into cyphtWebmail/admin directory, to use to setup module.
 		$this->config_page_url = array("setup.php@cyphtwebmail");
@@ -246,7 +246,7 @@ class modcyphtWebmail extends DolibarrModules
 		// Dictionaries
 		/* Example:
 		 $this->dictionaries=array(
-		 'langs' => 'cyphtWebmail@cyphtWebmail',
+		 'langs' => 'cyphtwebmail@cyphtwebmail',
 		 // List of tables we want to see into dictionary editor
 		 'tabname' => array("table1", "table2", "table3"),
 		 // Label of tables
@@ -264,7 +264,7 @@ class modcyphtWebmail extends DolibarrModules
 		 // Name of columns with primary key (try to always name it 'rowid')
 		 'tabrowid' => array("rowid", "rowid", "rowid"),
 		 // Condition to show each dictionary
-		 'tabcond' => array(isModEnabled('cyphtWebmail'), isModEnabled('cyphtWebmail'), isModEnabled('cyphtWebmail')),
+		 'tabcond' => array(isModEnabled('cyphtwebmail'), isModEnabled('cyphtwebmail'), isModEnabled('cyphtwebmail')),
 		 // Tooltip for every fields of dictionaries: DO NOT PUT AN EMPTY ARRAY
 		 'tabhelp' => array(array('code' => $langs->trans('CodeTooltipHelp'), 'field2' => 'field2tooltip'), array('code' => $langs->trans('CodeTooltipHelp'), 'field2' => 'field2tooltip'), ...),
 		 );
@@ -349,10 +349,10 @@ class modcyphtWebmail extends DolibarrModules
 			'prefix' => img_picto('', $this->picto, 'class="pictofixedwidth valignmiddle"'),
 			'mainmenu' => 'cyphtwebmail',
 			'leftmenu' => '',
-			'url' => '/cyphtWebmail/index.php',
+			'url' => '/cyphtwebmail/index.php',
 			'langs' => 'cyphtwebmail@cyphtwebmail', // Lang file to use (without .lang) by module. File must be in langs/code_CODE/ directory.
 			'position' => 1000 + $r,
-			'enabled' => "isModEnabled('cyphtwebmail')", // Define condition to show or hide menu entry. Use "isModEnabled('cyphtWebmail')" if entry must be visible if module is enabled (those quote marks are importants).
+			'enabled' => "isModEnabled('cyphtwebmail')", // Define condition to show or hide menu entry. Use "isModEnabled('cyphtwebmail')" if entry must be visible if module is enabled (those quote marks are importants).
 			'perms' => '1', // Use 'perms'=>'$user->hasRight("cyphtWebmail", "myobject", "read")' if you want your menu with a permission rules
 			'target' => '',
 			'user' => 2, // 0=Menu for internal users, 1=external users, 2=both
@@ -379,7 +379,7 @@ class modcyphtWebmail extends DolibarrModules
 			'prefix' => img_picto('', $this->picto, 'class="pictofixedwidth valignmiddle paddingright"'),
 			'mainmenu' => 'cyphtwebmail',
 			'leftmenu' => 'cyphtwebmail_index',
-			'url' => '/cyphtWebmail/index.php',
+			'url' => '/cyphtwebmail/index.php',
 			'langs' => 'cyphtwebmail@cyphtwebmail',
 			'position' => 1000 + $r,
 			'enabled' => "isModEnabled('cyphtwebmail')",
@@ -487,7 +487,7 @@ class modcyphtWebmail extends DolibarrModules
 			'titre' => 'CyphtMenuModuleSetup',
 			'mainmenu' => 'cyphtwebmail',
 			'leftmenu' => 'cyphtwebmail_setup',
-			'url' => '/cyphtWebmail/admin/setup.php',
+			'url' => '/cyphtwebmail/admin/setup.php',
 			'langs' => 'cyphtwebmail@cyphtwebmail',
 			'position' => 1000 + $r,
 			'enabled' => "isModEnabled('cyphtwebmail')",
@@ -506,10 +506,10 @@ class modcyphtWebmail extends DolibarrModules
 			'prefix' => img_picto('', $this->picto, 'class="pictofixedwidth valignmiddle paddingright"'),
 			'mainmenu' => 'cyphtWebmail',
 			'leftmenu' => 'myobject',
-			'url' => '/cyphtWebmail/index.php',
-			'langs' => 'cyphtWebmail@cyphtWebmail',	        // Lang file to use (without .lang) by module. File must be in langs/code_CODE/ directory.
+			'url' => '/cyphtwebmail/index.php',
+			'langs' => 'cyphtwebmail@cyphtwebmail',	        // Lang file to use (without .lang) by module. File must be in langs/code_CODE/ directory.
 			'position' => 1000 + $r,
-			'enabled' => "isModEnabled('cyphtWebmail')", // Define condition to show or hide menu entry. Use isModEnabled("cyphtWebmail") if entry must be visible if module is enabled.
+			'enabled' => "isModEnabled('cyphtwebmail')", // Define condition to show or hide menu entry. Use isModEnabled("cyphtWebmail") if entry must be visible if module is enabled.
 			'perms' => '$user->hasRight("cyphtWebmail", "myobject", "read")',
 			'target' => '',
 			'user' => 2,				                // 0=Menu for internal users, 1=external users, 2=both
@@ -522,9 +522,9 @@ class modcyphtWebmail extends DolibarrModules
 			'mainmenu' => 'cyphtWebmail',
 			'leftmenu' => 'cyphtWebmail_myobject_new',
 			'url' => '/cyphtWebmail/myobject_card.php?action=create',
-			'langs' => 'cyphtWebmail@cyphtWebmail',	        // Lang file to use (without .lang) by module. File must be in langs/code_CODE/ directory.
+			'langs' => 'cyphtwebmail@cyphtwebmail',	        // Lang file to use (without .lang) by module. File must be in langs/code_CODE/ directory.
 			'position' => 1000 + $r,
-			'enabled' => "isModEnabled('cyphtWebmail')", // Define condition to show or hide menu entry. Use isModEnabled("cyphtWebmail") if entry must be visible if module is enabled. Use '$leftmenu==\'system\'' to show if leftmenu system is selected.
+			'enabled' => "isModEnabled('cyphtwebmail')", // Define condition to show or hide menu entry. Use isModEnabled("cyphtWebmail") if entry must be visible if module is enabled. Use '$leftmenu==\'system\'' to show if leftmenu system is selected.
 			'perms' => '$user->hasRight("cyphtWebmail", "myobject", "write")'
 			'target' => '',
 			'user' => 2,				                // 0=Menu for internal users, 1=external users, 2=both
@@ -537,9 +537,9 @@ class modcyphtWebmail extends DolibarrModules
 			'mainmenu' => 'cyphtWebmail',
 			'leftmenu' => 'cyphtWebmail_myobject_list',
 			'url' => '/cyphtWebmail/myobject_list.php',
-			'langs' => 'cyphtWebmail@cyphtWebmail',	        // Lang file to use (without .lang) by module. File must be in langs/code_CODE/ directory.
+			'langs' => 'cyphtwebmail@cyphtwebmail',	        // Lang file to use (without .lang) by module. File must be in langs/code_CODE/ directory.
 			'position' => 1000 + $r,
-			'enabled' => "isModEnabled('cyphtWebmail')", // Define condition to show or hide menu entry. Use isModEnabled("cyphtWebmail") if entry must be visible if module is enabled.
+			'enabled' => "isModEnabled('cyphtwebmail')", // Define condition to show or hide menu entry. Use isModEnabled("cyphtWebmail") if entry must be visible if module is enabled.
 			'perms' => '$user->hasRight("cyphtWebmail", "myobject", "read")'
 			'target' => '',
 			'user' => 2,				                // 0=Menu for internal users, 1=external users, 2=both
@@ -631,7 +631,7 @@ class modcyphtWebmail extends DolibarrModules
 
 		// Create tables of module at module activation
 		//$result = $this->_load_tables('/install/mysql/', 'cyphtWebmail');
-		$result = $this->_load_tables('/cyphtWebmail/sql/');
+		$result = $this->_load_tables('/cyphtwebmail/sql/');
 		if ($result < 0) {
 			return -1; // Do not activate module if error 'not allowed' returned when loading module SQL queries (the _load_table run sql with run_sql with the error allowed parameter set to 'default')
 		}
@@ -646,19 +646,19 @@ class modcyphtWebmail extends DolibarrModules
 		 * is outside the web root and writable by the webserver. That is the
 		 * whole point: an installed module should never need write access to
 		 * its own folder. */
-		if ($this->provisionInstallation() < 0) {
+		if ($this->runUpgrade() < 0) {
 			return -1;
 		}
 
 		// Create extrafields during init
 		//include_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
 		//$extrafields = new ExtraFields($this->db);
-		//$result0=$extrafields->addExtraField('cyphtWebmail_separator1', "Separator 1", 'separator', 1,  0, 'thirdparty',   0, 0, '', array('options'=>array(1=>1)), 1, '', 1, 0, '', '', 'cyphtWebmail@cyphtWebmail', 'isModEnabled("cyphtWebmail")');
-		//$result1=$extrafields->addExtraField('cyphtWebmail_myattr1', "New Attr 1 label", 'boolean', 1,  3, 'thirdparty',   0, 0, '', '', 1, '', -1, 0, '', '', 'cyphtWebmail@cyphtWebmail', 'isModEnabled("cyphtWebmail")');
-		//$result2=$extrafields->addExtraField('cyphtWebmail_myattr2', "New Attr 2 label", 'varchar', 1, 10, 'project',      0, 0, '', '', 1, '', -1, 0, '', '', 'cyphtWebmail@cyphtWebmail', 'isModEnabled("cyphtWebmail")');
-		//$result3=$extrafields->addExtraField('cyphtWebmail_myattr3', "New Attr 3 label", 'varchar', 1, 10, 'bank_account', 0, 0, '', '', 1, '', -1, 0, '', '', 'cyphtWebmail@cyphtWebmail', 'isModEnabled("cyphtWebmail")');
-		//$result4=$extrafields->addExtraField('cyphtWebmail_myattr4', "New Attr 4 label", 'select',  1,  3, 'thirdparty',   0, 1, '', array('options'=>array('code1'=>'Val1','code2'=>'Val2','code3'=>'Val3')), 1,'', -1, 0, '', '', 'cyphtWebmail@cyphtWebmail', 'isModEnabled("cyphtWebmail")');
-		//$result5=$extrafields->addExtraField('cyphtWebmail_myattr5', "New Attr 5 label", 'text',    1, 10, 'user',         0, 0, '', '', 1, '', -1, 0, '', '', 'cyphtWebmail@cyphtWebmail', 'isModEnabled("cyphtWebmail")');
+		//$result0=$extrafields->addExtraField('cyphtWebmail_separator1', "Separator 1", 'separator', 1,  0, 'thirdparty',   0, 0, '', array('options'=>array(1=>1)), 1, '', 1, 0, '', '', 'cyphtwebmail@cyphtwebmail', 'isModEnabled("cyphtWebmail")');
+		//$result1=$extrafields->addExtraField('cyphtWebmail_myattr1', "New Attr 1 label", 'boolean', 1,  3, 'thirdparty',   0, 0, '', '', 1, '', -1, 0, '', '', 'cyphtwebmail@cyphtwebmail', 'isModEnabled("cyphtWebmail")');
+		//$result2=$extrafields->addExtraField('cyphtWebmail_myattr2', "New Attr 2 label", 'varchar', 1, 10, 'project',      0, 0, '', '', 1, '', -1, 0, '', '', 'cyphtwebmail@cyphtwebmail', 'isModEnabled("cyphtWebmail")');
+		//$result3=$extrafields->addExtraField('cyphtWebmail_myattr3', "New Attr 3 label", 'varchar', 1, 10, 'bank_account', 0, 0, '', '', 1, '', -1, 0, '', '', 'cyphtwebmail@cyphtwebmail', 'isModEnabled("cyphtWebmail")');
+		//$result4=$extrafields->addExtraField('cyphtWebmail_myattr4', "New Attr 4 label", 'select',  1,  3, 'thirdparty',   0, 1, '', array('options'=>array('code1'=>'Val1','code2'=>'Val2','code3'=>'Val3')), 1,'', -1, 0, '', '', 'cyphtwebmail@cyphtwebmail', 'isModEnabled("cyphtWebmail")');
+		//$result5=$extrafields->addExtraField('cyphtWebmail_myattr5', "New Attr 5 label", 'text',    1, 10, 'user',         0, 0, '', '', 1, '', -1, 0, '', '', 'cyphtwebmail@cyphtwebmail', 'isModEnabled("cyphtWebmail")');
 
 		// Permissions
 		$this->remove($options);
@@ -714,42 +714,22 @@ class modcyphtWebmail extends DolibarrModules
 	}
 
 	/**
-	 * Create the per-installation state a distributed build cannot contain.
+	 * Bring this installation up to the schema the code expects.
 	 *
-	 * Three secrets and two directories. The secrets are minted once and kept
-	 * in llx_const, so re-activating an existing installation is harmless:
-	 * each getOrCreate* returns what is already there rather than rolling a
-	 * new value, which matters because changing USER_CONFIG_SECRET would
-	 * orphan every stored mailbox password.
-	 *
-	 * Read back at runtime by CyphtEnvBootstrap, which is why none of it is
-	 * written to a file.
+	 * Activation and upgrade share one path. CyphtUpgrade is idempotent, so
+	 * enabling an already provisioned installation returns the existing
+	 * secrets rather than minting new ones, which matters because
+	 * USER_CONFIG_SECRET decrypts every stored mailbox password.
 	 *
 	 * @return int<-1,1> 1 on success, -1 on failure
 	 */
-	private function provisionInstallation()
+	private function runUpgrade()
 	{
-		global $conf, $langs;
+		require_once __DIR__ . '/../../class/install/upgrade.class.php';
 
-		require_once __DIR__ . '/../../class/install/paths.class.php';
-		require_once __DIR__ . '/../../class/auth/token.class.php';
-
-		try {
-			$token = new CyphtToken($this->db);
-
-			// SSO assertions, encryption of stored mailbox passwords, and
-			// Cypht's own per-site fingerprint input.
-			$token->getOrCreateSsoSecret();
-			$token->getOrCreateConfigSecret();
-			$token->getOrCreateSiteId();
-
-			// Cypht writes user settings and in-progress attachments here.
-			// getDataDir() creates both subdirectories.
-			$paths = new CyphtPaths();
-			$paths->getDataDir();
-		} catch (Exception $e) {
-			$langs->load("errors");
-			$this->error = 'CyphtWebmail could not provision this installation: ' . $e->getMessage();
+		$upgrade = new CyphtUpgrade($this->db);
+		if (!$upgrade->run(true)) {
+			$this->error = $upgrade->error;
 
 			return -1;
 		}

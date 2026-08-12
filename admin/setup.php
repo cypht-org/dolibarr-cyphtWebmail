@@ -50,11 +50,20 @@ if (!$user->admin) {
 	accessforbidden();
 }
 
-$langs->loadLangs(array("admin", "cyphtWebmail@cyphtWebmail"));
+$langs->loadLangs(array("admin", "cyphtwebmail@cyphtwebmail"));
 
 $action = GETPOST('action', 'aZ09');
 $manager = new CyphtWebmail($db);
 $buildResult = null;
+
+// Same self-triggering upgrade check as the webmail entry point: an admin
+// opening this page after replacing the files should not have to know that
+// disabling and re-enabling the module is what applies them.
+require_once __DIR__.'/../class/install/upgrade.class.php';
+$cyphtUpgrade = new CyphtUpgrade($db);
+if (!$cyphtUpgrade->run()) {
+	setEventMessages($cyphtUpgrade->error, null, 'warnings');
+}
 
 if ($action == 'update_settings') {
 	dolibarr_set_const($db, 'CYPHTWEBMAIL_IMAP_NAME', GETPOST('imap_name', 'alphanohtml'), 'chaine', 0, '', $conf->entity);
@@ -129,9 +138,29 @@ $installedVersion = $manager->getInstalledVersion();
 print $installedVersion ? dol_escape_htmltag($installedVersion) : '<span class="error">'.$langs->trans("CyphtWebmailNotInstalled").'</span>';
 print '</td></tr>';
 
+// build.json travels with the build, so it is the only thing a prebuilt
+// release can answer this with. CYPHTWEBMAIL_BUILT_VERSION is written to
+// llx_const by a Dolibarr build and is therefore empty on every shipped zip.
+$buildInfo = $manager->getBuildInfo();
+
+print '<tr class="oddeven"><td>'.$langs->trans("CyphtWebmailModuleVersion").'</td><td>';
+print (!empty($buildInfo['module_version']))
+	? dol_escape_htmltag($buildInfo['module_version'])
+	: '<span class="opacitymedium">-</span>';
+print '</td></tr>';
+
 print '<tr class="oddeven"><td>'.$langs->trans("CyphtWebmailBuiltVersion").'</td><td>';
-$builtVersion = $manager->getBuiltVersion();
-print $builtVersion ? dol_escape_htmltag($builtVersion) : $langs->trans("CyphtWebmailNeverBuilt");
+$builtVersion = (!empty($buildInfo['cypht_version'])) ? $buildInfo['cypht_version'] : $manager->getBuiltVersion();
+if ($builtVersion) {
+	print dol_escape_htmltag($builtVersion);
+	// Catches someone running composer update underneath a compiled build:
+	// public/ was generated against one Cypht and vendor/ now holds another.
+	if ($installedVersion && $installedVersion !== $builtVersion) {
+		print ' <span class="warning">'.$langs->trans("CyphtWebmailVersionMismatch", $builtVersion, $installedVersion).'</span>';
+	}
+} else {
+	print $langs->trans("CyphtWebmailNeverBuilt");
+}
 print '</td></tr>';
 
 print '<tr class="oddeven"><td>'.$langs->trans("CyphtWebmailLastBuild").'</td><td>';
@@ -153,17 +182,11 @@ print '</td></tr>';
 
 print '</table>';
 
-// Two independent questions about the build controls.
-//
-// Can they work here: Composer, a PHP binary, proc_open() and a writable
-// module directory. checkBuildRequirements() answers that, and it is what
-// hides the controls after a zip deploy, which lands read only.
-//
-// Should they be offered at all: releases ship precompiled, so an ordinary
-// installation never builds and the button is only a way to break a working
-// one. It is a developer tool, shown when Dolibarr itself is not in
-// production mode, with a constant to force it on for someone debugging a
-// production box.
+// The build controls are gated twice: on whether they can work here
+// (checkBuildRequirements, which is what hides them after a read-only zip
+// deploy) and on whether they should be offered at all. Releases ship
+// precompiled, so on an ordinary install the button can only break a working
+// one; it stays a developer tool unless the constant forces it on.
 global $dolibarr_main_prod;
 
 $requirements = $manager->checkBuildRequirements();
@@ -259,7 +282,7 @@ if ($showBuildControls) {
 	// in the log from closing this tag early.
 	print '<script type="application/json" id="cyphtwebmail-last-log">'.json_encode($lastBuildLog).'</script>';
 
-	print '<script src="'.dol_buildpath('/cyphtWebmail/js/admin/setup.js', 1).'"></script>';
+	print '<script src="'.dol_buildpath('/cyphtwebmail/js/admin/setup.js', 1).'"></script>';
 }
 
 llxFooter();

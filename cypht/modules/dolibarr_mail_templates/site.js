@@ -87,10 +87,9 @@ var dolibarr_mail_templates_render = function(strings, term) {
 
     nodes.list.innerHTML = '';
 
-    /* Group in one pass so each heading can carry its own count and its own
-     * container of rows. Type is a heading rather than a gate: making it a
-     * gate hid the whole catalogue behind a guess about which type a template
-     * lived under. */
+    /* Group in one pass so each heading carries its own count and container.
+     * Type is a heading, not a gate: as a gate it hid the catalogue behind a
+     * guess at which type a template lived under. */
     var groups = [];
     var byType = {};
     shown.forEach(function(row) {
@@ -140,10 +139,9 @@ var dolibarr_mail_templates_render = function(strings, term) {
             item.textContent = row.label;
 
             if (row.flagged) {
-                /* Flagged before the text lands in the draft, not after. Info
-                 * blue and not an amber triangle, to match the note in the
-                 * preview: this is a property of the template, not a problem
-                 * with it. */
+                /* Info blue, not an amber triangle: placeholders are a
+                 * property of the template, not a fault. Matches the preview
+                 * note. */
                 var mark = document.createElement('i');
                 mark.className = 'bi bi-braces ms-1 text-primary';
                 mark.setAttribute('title', strings.flagged);
@@ -200,12 +198,9 @@ var dolibarr_mail_templates_toggle_group = function(head) {
 /**
  * List the markers that survived substitution.
  *
- * Deliberately not styled as a warning. Nothing is wrong: a transactional
- * template is written around an object compose does not have, and these are
- * simply the blanks left to fill. Amber alert text framed an ordinary state as
- * a fault. The note is quiet and the markers are chips, so they read as a
- * checklist of things to replace rather than as an error, while still being
- * the most findable thing in the preview.
+ * Not styled as a warning: leftover markers are the normal state for a
+ * template written around an object compose does not have. Chips, not alert
+ * text, so they read as blanks to fill.
  *
  * @param {HTMLElement} box     Container, emptied and rebuilt
  * @param {Object}      strings Translated strings from the trigger
@@ -394,12 +389,9 @@ var dolibarr_mail_templates_shell = function(strings) {
         ' autocomplete="off" placeholder="' + strings.search + '" aria-label="' + strings.search + '">' +
         '<div id="dolibarr_mail_template_list" role="listbox" style="max-height:18rem; overflow-y:auto;"></div>' +
         '</div>' +
-        /* Two boxes, not one. The preview is what the template says; the
-         * placeholder note is what the template will need from you. Folding
-         * them into a single card made the second look like a footnote of the
-         * first. text-break is not decoration: a marker like
-         * __TICKET_USER_ASSIGN__ is a single unbroken word and will push the
-         * dialog wider than the viewport without it. */
+        /* text-break is load-bearing: a marker like __TICKET_USER_ASSIGN__ is
+         * one unbroken word and pushes the dialog past the viewport without
+         * it. */
         '<div id="dolibarr_mail_template_preview" class="mt-3" hidden>' +
         '<div class="fw-bold mb-1">' + strings.preview + '</div>' +
         '<div class="border rounded p-2">' +
@@ -479,15 +471,20 @@ var dolibarr_mail_templates_open = function(strings) {
 
 var dolibarr_mail_templates_init = function() {
     var root = document.getElementById('dolibarr_mail_templates_picker');
-    if (!root) {
+    var toggle = document.getElementById('dolibarr_mail_template_toggle');
+    if (!root || !toggle) {
         return; /* not the compose page, or nothing to show */
     }
 
-    /* The output module renders last in the form, because rendering it in the
-     * middle splits Cypht's button row. Put it back where it reads: directly
-     * under the message box, next to the field it fills. Guarded at every step
-     * so an upstream markup change leaves the trigger working where it is
-     * rather than throwing. */
+    if (toggle.getAttribute('data-dolibarr-bound') === '1') {
+        return;
+    }
+    toggle.setAttribute('data-dolibarr-bound', '1');
+
+    /* The output module has to render last, or it splits Cypht's button row,
+     * so move it under the message box here. Guarded at every step: an
+     * upstream markup change should leave the trigger where it is, not
+     * throw. */
     var composeBody = document.getElementById('compose_body');
     if (composeBody) {
         var anchor = composeBody.closest('.form-floating') || composeBody.parentNode;
@@ -497,10 +494,6 @@ var dolibarr_mail_templates_init = function() {
     }
 
     var strings = dolibarr_mail_templates_strings(root);
-    var toggle = document.getElementById('dolibarr_mail_template_toggle');
-    if (!toggle) {
-        return;
-    }
 
     toggle.addEventListener('click', function() {
         dolibarr_mail_templates_hide_undo();
@@ -511,6 +504,20 @@ var dolibarr_mail_templates_init = function() {
     if (undoBtn) {
         undoBtn.addEventListener('click', dolibarr_mail_templates_undo);
     }
+};
+
+/* Two entry points, because there are two ways to arrive at compose.
+ *
+ */
+var dolibarr_mail_templates_compose_handler = window.applyComposePageHandlers;
+window.applyComposePageHandlers = function(routeParams) {
+    var unmount = dolibarr_mail_templates_compose_handler
+        ? dolibarr_mail_templates_compose_handler(routeParams)
+        : undefined;
+
+    dolibarr_mail_templates_init();
+
+    return unmount;
 };
 
 $(document).ready(function() {

@@ -20,12 +20,9 @@ require_once __DIR__ . '/../install/paths.class.php';
 /**
  * \file        class/install/vendorlayout.class.php
  * \ingroup     cyphtWebmail
- * \brief       Bridges Cypht's flat-Composer-dependency layout (installed
- *              as a direct dependency of this module, same as Tiki does)
- *              against Cypht's own scripts, which expect a nested vendor/
- *              inside their own package directory. Also home to the
- *              generic recursive copy/delete helpers, also used by
- *              CyphtPipeline::publishSite().
+ * \brief       Bridges Cypht's flat-Composer layout against its own scripts,
+ *              which expect a nested vendor/. Also home to the recursive
+ *              copy/delete helpers CyphtPipeline::publishSite() uses.
  */
 class CyphtVendorLayout
 {
@@ -48,13 +45,10 @@ class CyphtVendorLayout
 	}
 
 	/**
-	 * Cypht's own scripts expect a nested vendor/autoload.php inside their
-	 * own package directory, since they're written for a standalone Cypht
-	 * checkout. We install Cypht as a flat dependency instead (same as
-	 * Tiki), so there is no nested vendor/ there. This creates a shim at
-	 * the path Cypht expects, forwarding to the real shared autoloader.
-	 * Must be re-created on every build: Composer re-extracts a package's
-	 * directory whenever its locked version changes.
+	 * Cypht's scripts expect a nested vendor/autoload.php in their own package
+	 * directory; installed flat, there is none. Shims the path they expect.
+	 * Re-created every build, since Composer re-extracts the package whenever
+	 * its locked version changes.
 	 *
 	 * @return bool
 	 */
@@ -79,39 +73,146 @@ class CyphtVendorLayout
 			return false;
 		}
 
-		// Same flat-dependency problem as autoload.php above, but for the raw
-		// asset directories (Bootstrap, Bootswatch) config_gen.php reads off
-		// disk. Rebuilt only when the installed versions change: copying them
-		// takes minutes and overruns the request.
+		return $this->mirrorVendorAssets($bridgeDir);
+	}
+
+	/**
+	 * Everything Cypht reads from VENDOR_PATH off disk rather than through
+	 * the autoloader.
+	 *
+	 * Globs, not whole packages: 6.5MB of 150MB. From config_gen.php 482, 556,
+	 * 616, 618, lib/js_libs.php JS_LIBS and developer/modules.php:36. Regrep
+	 * VENDOR_PATH and JS_LIBS after a Cypht upgrade.
+	 *
+	 * @return array<string,string[]> Composer vendor namespace => path globs
+	 */
+	private function assetManifest()
+	{
+		return array(
+			'twbs' => array(
+				'bootstrap/dist/css/bootstrap.min.css',
+				// Cypht's own JS is inert without it: Bootstrap drives the
+				// dropdowns and the modals Hm_Modal builds on.
+				'bootstrap/dist/js/bootstrap.bundle.min.js',
+				'bootstrap-icons/font/bootstrap-icons.css',
+				'bootstrap-icons/font/fonts/*',
+			),
+			'thomaspark' => array(
+				'bootswatch/dist/*/bootstrap.min.css',
+			),
+			// Read by the developer module, which falls back to shelling out
+			// to git when it is missing.
+			'composer' => array(
+				'installed.json',
+			),
+		);
+	}
+
+	/**
+	 * Put those assets where Cypht's scripts expect them.
+	 *
+	 * Copies, not links: a symlink needs privileges Windows withholds from
+	 * Apache, a junction needs exec(), and neither survives being zipped.
+	 * Failure is fatal here because the site just renders unstyled.
+	 *
+	 * @param string $bridgeDir vendor/ inside the Cypht package
+	 * @return bool
+	 */
+	private function mirrorVendorAssets($bridgeDir)
+	{
 		$moduleVendor = $this->paths->getModuleRoot() . '/vendor';
-		foreach (array('twbs', 'thomaspark') as $vendor) {
-			$target = $moduleVendor . '/' . $vendor;
-			$link = $bridgeDir . '/' . $vendor;
+
+		foreach ($this->assetManifest() as $vendor => $globs) {
+			$source = $moduleVendor . '/' . $vendor;
+			$dest = $bridgeDir . '/' . $vendor;
 			$marker = $bridgeDir . '/.' . $vendor . '.bridged';
 
-			if (!is_dir($target)) {
-				continue; // not installed, nothing to bridge
+			if (!is_dir($source)) {
+				continue;
 			}
 
 			$fingerprint = $this->bridgeFingerprint($vendor);
-			if ($fingerprint !== '' && is_dir($link) && @file_get_contents($marker) === $fingerprint) {
-				continue; // already bridged at this exact version
+			if ($fingerprint !== '' && @file_get_contents($marker) === $fingerprint
+				&& $this->assetsPresent($source, $dest, $globs)) {
+				continue;
 			}
 
-			$this->unbridge($link);
-
-			$linked = @symlink($target, $link);
-			if (!$linked) {
-				$linked = $this->makeJunction($target, $link);
+			// Older builds left a symlink, a junction or a full copy here.
+			if (!$this->resetDir($dest)) {
+				return false;
 			}
-			if (!$linked) {
-				$this->copyRecursive($target, $link);
+
+			$copied = 0;
+			foreach ($globs as $glob) {
+				foreach ((array) glob($source . '/' . $glob) as $file) {
+					if (!is_file($file)) {
+						continue;
+					}
+					$relative = substr($file, strlen($source) + 1);
+					if ($this->copyFile($file, $dest . '/' . $relative)) {
+						$copied++;
+					}
+				}
+			}
+
+			if (!$this->assetsPresent($source, $dest, $globs)) {
+				$this->error = 'Could not mirror ' . $vendor . ' assets into ' . $dest .
+					' (' . $copied . ' file(s) copied). Cypht builds its stylesheet from these, ' .
+					'so the site would come out unstyled. Check permissions on ' . $bridgeDir . '.';
+				return false;
 			}
 
 			@file_put_contents($marker, $fingerprint);
 		}
 
 		return true;
+	}
+
+	/**
+	 * True when every file the globs match in the source has a counterpart in
+	 * the destination. Also the post-copy check, so a partial copy is a
+	 * failure rather than a half-styled build.
+	 *
+	 * @param string $source
+	 * @param string $dest
+	 * @param string[] $globs
+	 * @return bool
+	 */
+	private function assetsPresent($source, $dest, array $globs)
+	{
+		foreach ($globs as $glob) {
+			$matches = glob($source . '/' . $glob);
+			if (!is_array($matches) || count($matches) === 0) {
+				continue;
+			}
+			foreach ($matches as $file) {
+				if (!is_file($file)) {
+					continue;
+				}
+				if (!is_file($dest . '/' . substr($file, strlen($source) + 1))) {
+					return false;
+				}
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Copy one file, creating its parent directories.
+	 *
+	 * @param string $src
+	 * @param string $dst
+	 * @return bool
+	 */
+	private function copyFile($src, $dst)
+	{
+		$dir = dirname($dst);
+		if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
+			return false;
+		}
+
+		return @copy($src, $dst);
 	}
 
 	/**
@@ -141,7 +242,10 @@ class CyphtVendorLayout
 			}
 		}
 		if (count($parts) === 0) {
-			return '';
+			/* "composer" is a directory Composer writes, not a package it
+			 * lists, so nothing matches the namespace. Hash the file instead
+			 * of giving up, or that entry re-copies on every build. */
+			return md5_file($installedJson);
 		}
 		sort($parts);
 
@@ -149,54 +253,33 @@ class CyphtVendorLayout
 	}
 
 	/**
-	 * Remove an existing bridge entry.
+	 * Clear a real directory, symlink or Windows junction and hand back an
+	 * empty directory.
 	 *
-	 * rmdir() is tried before deleteRecursive() because a Windows junction
-	 * looks like a directory to is_dir() and PHP does not reliably report it
-	 * via is_link(); rmdir() removes the junction and leaves its target
-	 * alone, while deleteRecursive() would follow it and delete the real
-	 * Bootstrap files.
+	 * Removals run unconditionally, and success is whether mkdir() then works:
+	 * a dangling junction is invisible to is_dir(), file_exists() and lstat()
+	 * while still holding the name, so probing first is useless. Order matters,
+	 * rmdir clears a junction without following it; deleteRecursive would walk
+	 * one and delete the Bootstrap files it points at.
 	 *
-	 * @param string $link
-	 * @return void
-	 */
-	private function unbridge($link)
-	{
-		if (is_link($link)) {
-			if (!@unlink($link)) {
-				@rmdir($link);
-			}
-			return;
-		}
-
-		if (is_dir($link)) {
-			if (!@rmdir($link)) {
-				$this->deleteRecursive($link);
-			}
-		}
-	}
-
-	/**
-	 * Windows directory junction, which unlike a symlink needs no elevation.
-	 *
-	 * @param string $target
-	 * @param string $link
+	 * @param string $dir
 	 * @return bool
 	 */
-	private function makeJunction($target, $link)
+	private function resetDir($dir)
 	{
-		if (DIRECTORY_SEPARATOR !== '\\' || !function_exists('exec')) {
+		if (!@unlink($dir) && !@rmdir($dir) && is_dir($dir)) {
+			$this->deleteRecursive($dir);
+		}
+
+		clearstatcache(true, $dir);
+
+		if (!@mkdir($dir, 0755, true) && !is_dir($dir)) {
+			$this->error = 'Could not clear ' . $dir . ', left behind by an earlier ' .
+				'build. Delete it by hand and build again.';
 			return false;
 		}
 
-		$cmd = 'mklink /J ' . escapeshellarg(str_replace('/', '\\', $link)) .
-			' ' . escapeshellarg(str_replace('/', '\\', $target));
-
-		$output = array();
-		$code = 1;
-		@exec('cmd /c ' . $cmd . ' 2>&1', $output, $code);
-
-		return $code === 0 && is_dir($link);
+		return true;
 	}
 
 	/**

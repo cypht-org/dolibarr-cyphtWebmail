@@ -78,11 +78,9 @@ class CyphtPaths
 	 */
 	public function getDataDir()
 	{
-		/* An offline build has no Dolibarr and therefore no managed data
-		 * directory. Nothing in that build stores user data; the only caller
-		 * that gets this far is the build lock. Somewhere outside the module
-		 * is deliberate, so a stray lock file cannot end up in a release
-		 * archive. */
+		/* No Dolibarr means no managed data directory. Only the build lock
+		 * gets this far, and it is kept outside the module so it cannot end
+		 * up in a release archive. */
 		if (!defined('DOL_DATA_ROOT')) {
 			$dir = rtrim(sys_get_temp_dir(), '/\\') . '/cyphtwebmail-build';
 			if (!is_dir($dir)) {
@@ -92,13 +90,69 @@ class CyphtPaths
 			return $dir;
 		}
 
-		$dir = DOL_DATA_ROOT . '/cyphtWebmail';
+		$dir = DOL_DATA_ROOT . '/cyphtwebmail';
 
 		require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
 		dol_mkdir($dir . '/users');
 		dol_mkdir($dir . '/attachments');
 
 		return $dir;
+	}
+
+	/**
+	 * What the build recorded about itself, or null when there is no record.
+	 *
+	 * A shipped release has no llx_const behind it, so CYPHTWEBMAIL_BUILT_VERSION
+	 * is empty on every prebuilt install and cannot answer "what is this".
+	 * build.json is written by the build itself and travels with it.
+	 *
+	 * @return array<string,string>|null Keys: module_version, cypht_version, built_at
+	 */
+	public function getBuildInfo()
+	{
+		$file = $this->getModuleRoot() . '/build.json';
+		if (!is_readable($file)) {
+			return null;
+		}
+
+		$data = json_decode((string) file_get_contents($file), true);
+
+		return is_array($data) ? $data : null;
+	}
+
+	/**
+	 * Record what this tree contains, at the module root. 
+	 *
+	 * @param string|null $cyphtVersion Defaults to what Composer reports
+	 * @return void
+	 */
+	public function writeBuildInfo($cyphtVersion = null)
+	{
+		$root = $this->getModuleRoot();
+
+		if ($cyphtVersion === null) {
+			$cyphtVersion = $this->getInstalledVersion();
+		}
+
+		$moduleVersion = null;
+		$descriptor = $root . '/core/modules/modcyphtWebmail.class.php';
+		if (is_readable($descriptor)) {
+			$source = file_get_contents($descriptor);
+			if ($source !== false && preg_match("/\\\$this->version\s*=\s*'([^']+)'/", $source, $m)) {
+				$moduleVersion = $m[1];
+			}
+		}
+
+		$info = array(
+			'module_version' => $moduleVersion,
+			'cypht_version' => $cyphtVersion,
+			'built_at' => gmdate('c'),
+		);
+
+		@file_put_contents(
+			$root . '/build.json',
+			json_encode($info, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n"
+		);
 	}
 
 	/**
@@ -180,11 +234,9 @@ class CyphtPaths
 	/**
 	 * Filesystem path of a user's Cypht settings file.
 	 *
-	 * MUST stay in step with Custom_User_Config::get_path() in the generated
-	 * modules/site/lib.php: Cypht writes the file, Dolibarr deletes it, and
-	 * neither can see the other's code. The readable prefix is cosmetic; the
-	 * sha256 fragment is what keeps two logins that sanitise identically
-	 * ("jean dupont" and "jean_dupont") from sharing one file.
+	 * MUST match Custom_User_Config::get_path() in the generated
+	 * modules/site/lib.php: Cypht writes the file, Dolibarr deletes it. The
+	 * sha256 fragment stops "jean dupont" and "jean_dupont" colliding.
 	 *
 	 * @param string $login Dolibarr login
 	 * @return string

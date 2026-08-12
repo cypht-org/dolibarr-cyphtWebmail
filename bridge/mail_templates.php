@@ -21,9 +21,8 @@
  *
  *              Visibility follows FormMail::getEMailTemplate() in
  *              htdocs/core/class/html.formmail.class.php: entity scoping plus
- *              "private = 0 OR fk_user = me". A private template belongs to
- *              one user and must not reach anyone else, so that clause is the
- *              access control here, not a filter.
+ *              "private = 0 OR fk_user = me". That clause is the access
+ *              control, not a filter.
  */
 
 // This is a machine-to-machine JSON endpoint: no session, no menus, no CSRF.
@@ -153,17 +152,10 @@ $conf->entity = ($bridgeUser->entity > 0 ? $bridgeUser->entity : 1);
 
 // ---------------------------------------------------------------------
 
-// The MailTo* keys the label map below relies on live in admin.lang, with the
-// recruitment one in its own file. Without these the map silently degrades to
-// the prettified token: trans() echoes an unknown key straight back, so the
-// picker would read "Invoice supplier send" instead of "Vendor invoices".
-// 'mails' and 'errors' match what htdocs/admin/mails_templates.php loads.
+// Miss a domain and trans() echoes the key back, so labels come out as raw
+// CamelCase. Template labels are themselves keys, living in the lang file of
+// whichever module seeded them.
 $langsArray = array('errors', 'admin', 'mails', 'other');
-// Template labels are themselves translation keys (see below), and those keys
-// live in the lang file of whichever module seeded the template: holiday.lang
-// owns HolidayHrInformationsPreviousMonth, partnership.lang owns the
-// SendingEmailOnPartnership* set, and so on. Miss a domain and those labels
-// come out as raw CamelCase.
 foreach (array(
 	'recruitment' => 'recruitment',
 	'member' => 'members',
@@ -188,19 +180,11 @@ $langs->loadLangs($langsArray);
 /**
  * Resolve a template label for display.
  *
- * Dolibarr stores some labels as a translation key in parentheses, so the seed
- * data carries things like '(SendingAdminEmailMessage)'. The rule is core's,
- * from FormMail::getEMailTemplate() in html.formmail.class.php:597:
+ * Labels like '(SendingAdminEmailMessage)' are translation keys. Rule copied
+ * from FormMail::getEMailTemplate(), html.formmail.class.php:597.
  *
- *     if (preg_match('/\((.*)\)/', $line->label, $reg)) {
- *         $labeltouse = $langs->trans($reg[1]);
- *     }
- *
- * A handful of those keys have no en_US translation at all, and core displays
- * them raw. Rather than show the user "SendingAdminEmailMessage", an untranslated
- * key is split on its capitals into readable words. That is a deliberate
- * departure from core: the webmail picker is not the admin screen, and a label
- * nobody can read is worse than one that does not match character for character.
+ * Keys with no en_US translation are split on capitals rather than shown raw
+ * as core does.
  *
  * @param string $label Raw label column
  * @param Translate $langs
@@ -228,13 +212,9 @@ function cyphtMailTemplateLabel($label, $langs)
 /**
  * Human label for a type_template token.
  *
- * The tokens are element names, not display strings, so 'invoice_supplier_send'
- * would otherwise reach the user verbatim. The mapping and its translation keys
- * are taken from the $elementList block in htdocs/admin/mails_templates.php so
- * the webmail names a type exactly as Dolibarr's own admin screen does.
- * Unmapped tokens fall back to a prettified form rather than being hidden: a
- * template the user can see in Dolibarr should never silently vanish here
- * because a module invented a type this map has not caught up with.
+ * Map and keys copied from the $elementList block in
+ * htdocs/admin/mails_templates.php. Unmapped tokens are prettified, not
+ * hidden, so a type this map has not caught up with still shows.
  *
  * @param string $token type_template value
  * @param Translate $langs
@@ -297,12 +277,9 @@ if (!$resql) {
 	cyphtMailTemplatesRespond(500, array('error' => 'Template query failed: '.$db->lasterror()));
 }
 
-// Resolves the object-free markers: company name, the user's signature, dates,
-// and __(Translated)__ strings. Anything written around a specific object, such
-// as __TICKET_URL__ on a ticket template, cannot resolve here because compose
-// has no such object. Those are reported per template in 'placeholders' below
-// rather than being stripped, since a half-filled template the user can finish
-// by hand is more useful than a silently gutted one.
+// Resolves only object-free markers. Anything written around an object, such
+// as __TICKET_URL__, cannot resolve here because compose has no such object;
+// those are reported in 'placeholders' rather than stripped.
 $substitutions = getCommonSubstitutionArray($langs, 0, null, null);
 
 $templates = array();

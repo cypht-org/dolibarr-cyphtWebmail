@@ -45,7 +45,7 @@ require_once __DIR__.'/class/webmail.class.php';
 
 global $conf, $db, $langs, $user;
 
-$langs->loadLangs(array("cyphtWebmail@cyphtWebmail"));
+$langs->loadLangs(array("cyphtwebmail@cyphtwebmail"));
 
 // Module-level gate for this POC: any logged in user, as long as the module
 // is enabled. No dedicated permission has been added yet (task for later,
@@ -55,6 +55,19 @@ if (!isModEnabled('cyphtwebmail')) {
 }
 
 $manager = new CyphtWebmail($db);
+
+/* Dolibarr calls nothing when a module's files are replaced, so an upgrade has
+ * to notice for itself. Normally this is a single indexed read that finds the
+ * version already current and returns. The one time it does work is the first
+ * request after new files land, which is exactly when nothing else would.
+ *
+ * A failure here is not fatal: the webmail may well still work, and refusing
+ * to load would turn a partial upgrade into an outage. It is logged instead. */
+require_once __DIR__.'/class/install/upgrade.class.php';
+$cyphtUpgrade = new CyphtUpgrade($db);
+if (!$cyphtUpgrade->run()) {
+	dol_syslog('CyphtWebmail upgrade check: '.$cyphtUpgrade->error, LOG_WARNING);
+}
 
 // Current Cypht page, carried in one opaque parameter holding Cypht's own
 // query string. Nested rather than mirrored because Cypht uses page/id/uid
@@ -71,7 +84,7 @@ if (!is_string($cyphtQuery) || !preg_match('/^[A-Za-z0-9_\-\.=&%+]{0,300}$/', $c
 $ssoOk = false;
 $publicUrl = '';
 if ($manager->isPublished()) {
-	$publicUrl = dol_buildpath('/cyphtWebmail/public/index.php', 1);
+	$publicUrl = dol_buildpath('/cyphtwebmail/public/index.php', 1);
 	$ssoOk = $manager->performSsoLogin($user->login, $publicUrl);
 }
 
@@ -80,7 +93,7 @@ llxHeader('', $langs->trans("CyphtWebmailArea"), '', '', 0, 0, '', '', '', 'mod-
 if (!$manager->isPublished()) {
 	print '<div class="warning" style="padding: 15px;">';
 	print $langs->trans("CyphtWebmailNotYetBuilt");
-	print ' <a href="'.dol_buildpath('/cyphtWebmail/admin/setup.php', 1).'">';
+	print ' <a href="'.dol_buildpath('/cyphtwebmail/admin/setup.php', 1).'">';
 	print $langs->trans("CyphtWebmailGoToSetup");
 	print '</a>';
 	print '</div>';
@@ -98,7 +111,7 @@ if (!$manager->isPublished()) {
 		'style="width:100%; height: calc(100vh - 220px); min-height: 500px; border: none;" '.
 		'title="Cypht Webmail"></iframe>';
 
-	$syncScript = dol_buildpath('/cyphtWebmail/js/cypht-url-sync.js', 1);
+	$syncScript = dol_buildpath('/cyphtwebmail/js/cypht-url-sync.js', 1);
 	$syncVersion = @filemtime(__DIR__.'/js/cypht-url-sync.js');
 
 	print '<script src="'.dol_escape_htmltag($syncScript.($syncVersion ? '?v='.$syncVersion : '')).'"></script>';

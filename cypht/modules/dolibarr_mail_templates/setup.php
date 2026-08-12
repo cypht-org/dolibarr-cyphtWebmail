@@ -23,13 +23,10 @@ add_handler('compose', 'load_dolibarr_mail_templates', true, 'dolibarr_mail_temp
  * writing an email to reach a feature most messages do not use. */
 add_output('compose', 'dolibarr_mail_templates_picker', true, 'dolibarr_mail_templates', 'compose_form_attach', 'after');
 
-/* Template bodies are fetched on demand rather than embedded in the compose
- * page. They are business correspondence: pricing, contract wording, whatever
- * a company puts in its templates. Shipping every template of every type into
- * the DOM on every compose load would expose all of it to anything that can
- * read the page, to serve the one template the user eventually picks. This
- * page returns labels for a chosen type, and a body only for a chosen
- * template. */
+/* Bodies are fetched on demand, never embedded in the compose page: templates
+ * hold pricing and contract wording, and putting all of them in the DOM to
+ * serve the one that gets picked exposes the lot. This page returns labels for
+ * a chosen type, and a body only for a chosen template. */
 setup_base_ajax_page('ajax_dolibarr_mail_templates', 'core');
 add_handler('ajax_dolibarr_mail_templates', 'load_dolibarr_mail_templates', true, 'dolibarr_mail_templates', 'load_user_data', 'after');
 add_handler('ajax_dolibarr_mail_templates', 'dolibarr_mail_templates_request', true, 'dolibarr_mail_templates', 'load_dolibarr_mail_templates', 'after');

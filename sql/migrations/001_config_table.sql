@@ -13,15 +13,14 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 --
--- Installation scoped configuration for the webmail, one row per key.
+-- Migration 001: the module configuration table.
 --
--- Not llx_const: dolibarr_set_const() encrypts anything ending in _KEY,
--- _PASS or _SECRET and decrypts it for $conf->global. The webmail reads its
--- config over PDO before Dolibarr loads, so it would get ciphertext and every
--- signed bridge request would fail on signature.
+-- Duplicates sql/llx_cyphtwebmail_config.sql on purpose: that file is only
+-- read on activation, and a files only upgrade never activates.
 --
--- Names are Cypht's own, so rows map straight into the environment.
-
+-- Ordering works because CyphtConfig::get() returns its default when the
+-- table is missing: the read fails, this creates it, the version goes in.
+-- Re-runnable; run_sql() lets "already exists" pass.
 
 CREATE TABLE llx_cyphtwebmail_config(
 	rowid              integer AUTO_INCREMENT PRIMARY KEY NOT NULL,
@@ -31,3 +30,5 @@ CREATE TABLE llx_cyphtwebmail_config(
 	date_creation      datetime NOT NULL,
 	tms                timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=innodb;
+
+ALTER TABLE llx_cyphtwebmail_config ADD UNIQUE INDEX uk_cyphtwebmail_config_name (entity, name);

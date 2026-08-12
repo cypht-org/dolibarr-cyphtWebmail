@@ -19,23 +19,10 @@
  * \file        class/runtime/envbootstrap.class.php
  * \ingroup     cyphtwebmail
  * \brief       Supplies Cypht's per-installation configuration at runtime,
- *              without writing anything to disk.
+ *              from conf.php and the database, without writing to disk.
  *
- *              A shipped build carries only the settings that are the same
- *              everywhere. Everything else, database credentials, generated
- *              secrets, data paths and bridge URLs, is discovered on each
- *              request: the credentials and paths from Dolibarr's own
- *              conf.php, the rest from llx_const.
- *
- *              This exists so an installed module never has to write a file.
- *              Shared hosting routinely denies the webserver write access
- *              inside the web root, and a module that must write its own
- *              configuration to start is a module that cannot be installed
- *              from a zip.
- *
- *              Deliberately plain PHP. It runs before Dolibarr is loaded, so
- *              it cannot use any Dolibarr helper, and before Cypht's
- *              autoloader, so it cannot use any Cypht class.
+ *              Plain PHP by necessity: runs before Dolibarr is loaded and
+ *              before Cypht's autoloader, so it can use neither.
  */
 class CyphtEnvBootstrap
 {
@@ -58,14 +45,8 @@ class CyphtEnvBootstrap
 	}
 
 	/**
-	 * Discover everything and put it in $_ENV.
-	 *
-	 * Hm_Environment::get() reads array_merge($_ENV, $_SERVER) on every call,
-	 * so populating $_ENV before Cypht loads its config is equivalent to
-	 * having written the values into .env, minus the write.
-	 *
-	 * Existing values win. A real .env entry is an explicit operator override
-	 * and must not be silently replaced by something derived.
+	 * Populating the environment before Cypht loads its config replaces the
+	 * .env write. Existing values win, so a real .env entry stays an override.
 	 *
 	 * @return bool True if the per-installation values are now available
 	 */
@@ -77,6 +58,14 @@ class CyphtEnvBootstrap
 		}
 
 		$values = $this->fromConf($conf);
+
+		/* Cypht's own VERSION constant is its internal framework number (0.1),
+		 * not the release. The real one is recorded by the build, so publish it
+		 * here for anything that needs to stamp what wrote a record. */
+		$build = $this->readBuildInfo();
+		if (isset($build['cypht_version']) && $build['cypht_version'] !== '') {
+			$values['CYPHT_VERSION'] = (string) $build['cypht_version'];
+		}
 
 		$consts = $this->readConsts($conf);
 		if ($consts === null) {
@@ -92,20 +81,45 @@ class CyphtEnvBootstrap
 			if ($value === null || $value === '') {
 				continue;
 			}
+
 			if (array_key_exists($key, $_ENV) && $_ENV[$key] !== '') {
-				continue;
+				$value = $_ENV[$key];
+			} else {
+				$_ENV[$key] = (string) $value;
 			}
-			$_ENV[$key] = (string) $value;
+
+			/* Both stores: Hm_Environment::get() reads $_ENV, but config/app.php
+			 * resolves 125 settings through env(), which is getenv() only.
+			 * Symfony's loader skips any name already in $_ENV, so it never
+			 * putenv()s these and they would fall back to upstream defaults. */
+			if (getenv($key) === false) {
+				putenv($key . '=' . $value);
+			}
 		}
 
 		return $consts !== null;
 	}
 
 	/**
+	 * @return array<string,mixed>
+	 */
+	private function readBuildInfo()
+	{
+		$file = $this->moduleRoot . '/build.json';
+		if (!is_readable($file)) {
+			return array();
+		}
+
+		$data = json_decode((string) file_get_contents($file), true);
+
+		return is_array($data) ? $data : array();
+	}
+
+	/**
 	 * Locate and evaluate Dolibarr's conf.php.
 	 *
-	 * Included inside a method so its many $dolibarr_* variables stay local
-	 * rather than polluting the global scope Cypht is about to use.
+	 * Included inside a method so its $dolibarr_* variables stay out of the
+	 * global scope Cypht is about to use.
 	 *
 	 * @return array<string,mixed>|null
 	 */
@@ -148,16 +162,18 @@ class CyphtEnvBootstrap
 			'prefix' => $dolibarr_main_db_prefix !== '' ? $dolibarr_main_db_prefix : 'llx_',
 			'data_root' => $dolibarr_main_data_root,
 			'url_root' => rtrim($dolibarr_main_url_root, '/'),
+			// conf.php sits at <web root>/conf/conf.php, so this is the
+			// directory url_root actually points at.
+			'root_dir' => dirname(dirname($path)),
 		);
 	}
 
 	/**
-	 * Where conf.php lives.
+	 * Walk up from the module looking for Dolibarr's conf.php.
 	 *
-	 * The normal layout is <dolibarr>/htdocs/custom/<module>, so conf.php is
-	 * two directories above the module. The environment override exists for
-	 * installations that put the module somewhere else entirely, which the
-	 * module already supports for building.
+	 * Every ancestor, not a fixed depth: htdocs/custom/<module> is only the
+	 * convention. CYPHTWEBMAIL_DOLIBARR_CONF wins, for a Dolibarr that is not
+	 * an ancestor at all.
 	 *
 	 * @return string|null
 	 */
@@ -168,29 +184,29 @@ class CyphtEnvBootstrap
 			return $override;
 		}
 
-		$candidates = array(
-			dirname($this->moduleRoot, 2) . '/conf/conf.php',
-			dirname($this->moduleRoot, 3) . '/htdocs/conf/conf.php',
-			dirname($this->moduleRoot) . '/conf/conf.php',
-		);
+		$dir = $this->moduleRoot;
 
-		foreach ($candidates as $candidate) {
-			if (is_readable($candidate)) {
-				return $candidate;
+		while (true) {
+			foreach (array($dir . '/conf/conf.php', $dir . '/htdocs/conf/conf.php') as $candidate) {
+				if (is_readable($candidate)) {
+					return $candidate;
+				}
 			}
-		}
 
-		return null;
+			// dirname() is its own parent at the filesystem root, on both platforms.
+			$parent = dirname($dir);
+			if ($parent === $dir) {
+				return null;
+			}
+			$dir = $parent;
+		}
 	}
 
 	/**
-	 * The values conf.php alone can answer: how to reach the database, where
-	 * Dolibarr keeps its data, and what URL it is served from.
+	 * The values conf.php alone can answer.
 	 *
-	 * Deriving the paths rather than storing them is deliberate. A stored
-	 * absolute path goes stale the moment the installation is moved or
-	 * restored somewhere else, and stale is worse than absent because it
-	 * fails later and less clearly.
+	 * Paths are derived rather than stored: a stored absolute path goes stale
+	 * when the installation moves, and stale fails later than absent.
 	 *
 	 * @param array<string,mixed> $conf
 	 * @return array<string,string>
@@ -198,7 +214,7 @@ class CyphtEnvBootstrap
 	private function fromConf(array $conf)
 	{
 		$dataDir = rtrim($conf['data_root'], '/\\') . '/cyphtwebmail';
-		$moduleUrl = $conf['url_root'] . '/custom/cyphtwebmail';
+		$moduleUrl = $conf['url_root'] . $this->moduleUrlPath($conf['root_dir']);
 
 		return array(
 			'DB_DRIVER' => ($conf['type'] === 'pgsql') ? 'pgsql' : 'mysql',
@@ -217,21 +233,42 @@ class CyphtEnvBootstrap
 	}
 
 	/**
-	 * The stored half: generated secrets and whatever the setup page saved.
+	 * Where the module sits under the Dolibarr web root, as a URL path.
 	 *
-	 * These already live in llx_const, written at activation and whenever the
-	 * setup form is saved, so there is nothing new to persist and no second
-	 * table to keep in step.
+	 * Measured, not assumed to be custom/<module>: a wrong path here is a 404
+	 * on the bridges that reads like a signature fault. Case-insensitive on
+	 * Windows. Falls back to the conventional location for a module symlinked
+	 * in, which has no path under the web root to measure.
+	 *
+	 * @param string $rootDir Directory url_root points at
+	 * @return string Leading slash, no trailing slash
+	 */
+	private function moduleUrlPath($rootDir)
+	{
+		$root = rtrim(str_replace('\\', '/', $rootDir), '/');
+		$module = rtrim(str_replace('\\', '/', $this->moduleRoot), '/');
+
+		$inside = (DIRECTORY_SEPARATOR === '\\')
+			? stripos($module, $root . '/') === 0
+			: strpos($module, $root . '/') === 0;
+
+		if ($root !== '' && $inside) {
+			return substr($module, strlen($root));
+		}
+
+		return '/custom/' . basename($module);
+	}
+
+	/**
+	 * The stored half: generated secrets and whatever the setup page saved.
 	 *
 	 * @param array<string,mixed> $conf
 	 * @return array<string,string>|null Null if the database was unreachable
 	 */
 	private function readConsts(array $conf)
 	{
-		/* Only the keys this module owns, mapped to the names Cypht expects.
-		 * An allow list rather than a prefix sweep: llx_const is shared, and
-		 * nothing outside this map should be able to reach Cypht's config by
-		 * being named suggestively. */
+		/* An allow list rather than a CYPHTWEBMAIL_% sweep: llx_const is
+		 * shared, so a suggestively named constant must not reach Cypht. */
 		$map = array(
 			'CYPHTWEBMAIL_IMAP_NAME' => 'IMAP_AUTH_NAME',
 			'CYPHTWEBMAIL_IMAP_SERVER' => 'IMAP_AUTH_SERVER',
@@ -288,16 +325,9 @@ class CyphtEnvBootstrap
 	/**
 	 * The module's own configuration table.
 	 *
-	 * Separate from llx_const because dolibarr_set_const() encrypts the value
-	 * of any constant whose name ends in _SECRET, _KEY, _PASS and a few more.
-	 * Dolibarr decrypts them again when it builds $conf->global, so its own
-	 * code never notices, but this reader is deliberately running before
-	 * Dolibarr exists and would get ciphertext. The signed bridge requests
-	 * would then be built from a different secret at each end and every one
-	 * would come back "Bad signature".
-	 *
-	 * Names in this table are already Cypht's own, so the rows map straight
-	 * across.
+	 * Not llx_const: dolibarr_set_const() encrypts anything ending in _SECRET
+	 * or _KEY, and this reader is raw PDO, so it would get ciphertext and
+	 * every signed bridge request would fail on signature.
 	 *
 	 * @param PDO $pdo
 	 * @param array<string,mixed> $conf
