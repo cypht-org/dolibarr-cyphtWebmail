@@ -138,14 +138,15 @@ $installedVersion = $manager->getInstalledVersion();
 print $installedVersion ? dol_escape_htmltag($installedVersion) : '<span class="error">'.$langs->trans("CyphtWebmailNotInstalled").'</span>';
 print '</td></tr>';
 
-// build.json travels with the build, so it is the only thing a prebuilt
-// release can answer this with. CYPHTWEBMAIL_BUILT_VERSION is written to
-// llx_const by a Dolibarr build and is therefore empty on every shipped zip.
 $buildInfo = $manager->getBuildInfo();
 
+$moduleVersion = (!empty($buildInfo['module_version']))
+	? $buildInfo['module_version']
+	: $manager->getModuleVersion();
+
 print '<tr class="oddeven"><td>'.$langs->trans("CyphtWebmailModuleVersion").'</td><td>';
-print (!empty($buildInfo['module_version']))
-	? dol_escape_htmltag($buildInfo['module_version'])
+print ($moduleVersion !== '')
+	? dol_escape_htmltag($moduleVersion)
 	: '<span class="opacitymedium">-</span>';
 print '</td></tr>';
 
@@ -153,7 +154,7 @@ print '<tr class="oddeven"><td>'.$langs->trans("CyphtWebmailBuiltVersion").'</td
 $builtVersion = (!empty($buildInfo['cypht_version'])) ? $buildInfo['cypht_version'] : $manager->getBuiltVersion();
 if ($builtVersion) {
 	print dol_escape_htmltag($builtVersion);
-	// Catches someone running composer update underneath a compiled build:
+	// Catches running composer update underneath a compiled build:
 	// public/ was generated against one Cypht and vendor/ now holds another.
 	if ($installedVersion && $installedVersion !== $builtVersion) {
 		print ' <span class="warning">'.$langs->trans("CyphtWebmailVersionMismatch", $builtVersion, $installedVersion).'</span>';
@@ -182,11 +183,6 @@ print '</td></tr>';
 
 print '</table>';
 
-// The build controls are gated twice: on whether they can work here
-// (checkBuildRequirements, which is what hides them after a read-only zip
-// deploy) and on whether they should be offered at all. Releases ship
-// precompiled, so on an ordinary install the button can only break a working
-// one; it stays a developer tool unless the constant forces it on.
 global $dolibarr_main_prod;
 
 $requirements = $manager->checkBuildRequirements();
@@ -196,8 +192,8 @@ $devMode = empty($dolibarr_main_prod) || getDolGlobalInt('CYPHTWEBMAIL_ENABLE_BU
 $showBuildControls = $canBuildHere && $devMode;
 
 // Nothing published means the webmail cannot run at all. That is worth saying
-// in any mode, so this warning is deliberately not behind $devMode: hiding a
-// broken install from the person who can fix it helps nobody.
+// in any mode, so this warning is deliberately not behind $devMode:
+// a production install that has never been built is broken, and the admin needs to know why.
 if (!$canBuildHere && !$published) {
 	print '<div class="warning" style="padding: 12px; margin-top: 10px;">';
 	print '<strong>'.$langs->trans("CyphtWebmailCannotBuildHere").'</strong><br><br>';
@@ -218,19 +214,12 @@ if (!$canBuildHere && !$published) {
 	print '</pre>';
 	print '</div>';
 } elseif (!$canBuildHere && $devMode) {
-	// Already built and working, just not rebuildable from here. No button and
-	// no log viewer, since neither can do anything; one line saying where to go.
-	// Only in dev mode: on a production install this is noise about something
-	// nobody is expected to do.
 	print load_fiche_titre($langs->trans("CyphtWebmailMaintenance"), '', '');
 	print '<div class="center opacitymedium" style="margin-top: 10px;">';
 	print $langs->trans("CyphtWebmailRebuildFromShell");
 	print ' <code>php scripts/build.php</code>';
 	print '</div>';
 } elseif ($showBuildControls) {
-	// Under its own heading rather than filed under build status: compiling is
-	// a developer action, not part of installing, and putting it beside the
-	// version table invited people to treat it as a required step.
 	print load_fiche_titre($langs->trans("CyphtWebmailMaintenance"), '', '');
 	print '<div class="center opacitymedium" style="margin-bottom: 8px;">';
 	print $langs->trans("CyphtWebmailMaintenanceHint");
@@ -243,10 +232,6 @@ if (!$canBuildHere && !$published) {
 	print '</form>';
 	print '</div>';
 } elseif (!$published) {
-	// Production, nothing compiled, but this server could compile if asked.
-	// The controls stay hidden because production installs are meant to run a
-	// shipped build, yet staying silent would leave an administrator looking
-	// at a webmail that cannot start with nothing telling them why.
 	print '<div class="warning" style="padding: 12px; margin-top: 10px;">';
 	print '<strong>'.$langs->trans("CyphtWebmailNeverBuilt").'</strong><br><br>';
 	print $langs->trans("CyphtWebmailBuildFromShell").'<br>';
@@ -257,8 +242,6 @@ if (!$canBuildHere && !$published) {
 	print '</div>';
 }
 
-// The log viewer only ever shows browser builds, so it follows the button:
-// where one cannot run, the other has nothing to show.
 if ($showBuildControls) {
 	// 'out' = real child-process output, 'err' = our own failure messages,
 	// 'info' = our own step/status lines. Stderr is not colored red just for

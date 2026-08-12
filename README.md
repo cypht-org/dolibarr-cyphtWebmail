@@ -21,6 +21,7 @@ Cypht is LGPL-2.1, Dolibarr is GPL-3.0. This module is GPL-3.0.
 - [Configuration reference](#configuration-reference)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
+- [Licence](#licence)
 
 ## What it does
 
@@ -293,3 +294,9 @@ Everything about changing this module lives in
 [CONTRIBUTING.md](CONTRIBUTING.md): the project layout, how the pieces fit
 together, how to add a Cypht module set or a bridge endpoint, the coding
 conventions, and the checklist to run before opening a PR.
+
+## Licence
+
+This module is free software under the GNU General Public License, either
+version 3 or, at your option, any later version. The full text is in
+[LICENSE](LICENSE).
