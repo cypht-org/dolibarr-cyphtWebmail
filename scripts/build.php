@@ -30,6 +30,16 @@ if (substr(php_sapi_name(), 0, 3) !== 'cli') {
 	exit(1);
 }
 
+error_reporting(E_ALL);
+ini_set('display_errors', 'stderr');
+
+register_shutdown_function(function () {
+	$fatal = error_get_last();
+	if ($fatal !== null && ($fatal['type'] & (E_ERROR | E_PARSE | E_CORE_ERROR | E_COMPILE_ERROR))) {
+		fwrite(STDERR, "\nFATAL: ".$fatal['message']."\n  at ".$fatal['file'].':'.$fatal['line']."\n");
+	}
+});
+
 $root = dirname(__DIR__);
 
 $options = array(

@@ -34,9 +34,27 @@ if (substr(php_sapi_name(), 0, 3) !== 'cli') {
 	exit(1);
 }
 
+/* Forced on, because php.ini decides this otherwise and XAMPP's CLI one ships
+ * display_errors off. A fatal then prints nothing at all and the script just
+ * returns non-zero, which reads as "it did nothing" rather than "it broke". */
+error_reporting(E_ALL);
+ini_set('display_errors', 'stderr');
+
+/* The same hole from the other side: a fatal skips every line below it, so
+ * without this the last thing printed is whatever step was in progress. */
+register_shutdown_function(function () {
+	$fatal = error_get_last();
+	if ($fatal !== null && ($fatal['type'] & (E_ERROR | E_PARSE | E_CORE_ERROR | E_COMPILE_ERROR))) {
+		fwrite(STDERR, "\nFATAL: ".$fatal['message']."\n  at ".$fatal['file'].':'.$fatal['line']."\n");
+	}
+});
+
 $root = dirname(__DIR__);
 
-$options = array('out' => dirname($root), 'version' => '', 'allow-dirty' => false, 'quiet' => false);
+// dist/ inside the module, which .gitignore already covers. The parent
+// directory was the old default and put releases outside the project, where
+// nobody thought to look.
+$options = array('out' => $root.'/dist', 'version' => '', 'allow-dirty' => false, 'quiet' => false);
 
 foreach (array_slice($argv, 1) as $arg) {
 	if ($arg === '--help' || $arg === '-h') {
@@ -46,7 +64,7 @@ Build a release archive.
   php build/buildzip.php [options]
 
   --version=X.Y.Z  name the archive this instead of the descriptor's version
-  --out=DIR        where to write the zip (default: the module's parent)
+  --out=DIR        where to write the zip (default: dist/ in the module)
   --allow-dirty    package uncommitted work; the archive will not match HEAD
   --quiet          only report the finished archive
 
@@ -121,18 +139,43 @@ function cyphtPkgFail($message)
 function cyphtPkgRun(array $cmd, $cwd)
 {
 	$cmdline = implode(' ', array_map('escapeshellarg', $cmd));
-	$spec = array(1 => array('pipe', 'w'), 2 => array('pipe', 'w'));
+
+	/* Files, not pipes, for the same reason CyphtPipeline::runProcess() uses
+	 * them. Draining stdout to EOF before reading stderr deadlocks as soon as
+	 * the child fills the stderr buffer, roughly 64KB, and Composer writes most
+	 * of its output to stderr. The staged build is composer plus config_gen, so
+	 * it passes that in seconds and the whole job hangs with nothing produced.
+	 *
+	 * stdin is a pipe we close immediately: a subprocess that decides to prompt
+	 * should get EOF and fail, not wait forever for a terminal that is not
+	 * there. */
+	$outFile = tempnam(sys_get_temp_dir(), 'cyphtpkg-out');
+	$errFile = tempnam(sys_get_temp_dir(), 'cyphtpkg-err');
+
+	$spec = array(
+		0 => array('pipe', 'r'),
+		1 => array('file', $outFile, 'w'),
+		2 => array('file', $errFile, 'w'),
+	);
 	$proc = @proc_open($cmdline, $spec, $pipes, $cwd);
 
 	if (!is_resource($proc)) {
+		@unlink($outFile);
+		@unlink($errFile);
 		return array(-1, 'could not start: '.$cmdline);
 	}
 
-	$out = stream_get_contents($pipes[1]).stream_get_contents($pipes[2]);
-	fclose($pipes[1]);
-	fclose($pipes[2]);
+	if (isset($pipes[0])) {
+		fclose($pipes[0]);
+	}
 
-	return array(proc_close($proc), $out);
+	$code = proc_close($proc);
+
+	$out = (string) @file_get_contents($outFile) . (string) @file_get_contents($errFile);
+	@unlink($outFile);
+	@unlink($errFile);
+
+	return array($code, $out);
 }
 
 /**
