@@ -143,9 +143,16 @@ print '</td></tr>';
 // llx_const by a Dolibarr build and is therefore empty on every shipped zip.
 $buildInfo = $manager->getBuildInfo();
 
+// build.json first, since on a release it records the version that was
+// actually packaged. A checkout that has never been built has no build.json,
+// so fall back to version.inc.php rather than showing a dash.
+$moduleVersion = (!empty($buildInfo['module_version']))
+	? $buildInfo['module_version']
+	: $manager->getModuleVersion();
+
 print '<tr class="oddeven"><td>'.$langs->trans("CyphtWebmailModuleVersion").'</td><td>';
-print (!empty($buildInfo['module_version']))
-	? dol_escape_htmltag($buildInfo['module_version'])
+print ($moduleVersion !== '')
+	? dol_escape_htmltag($moduleVersion)
 	: '<span class="opacitymedium">-</span>';
 print '</td></tr>';
 

@@ -33,7 +33,11 @@ class InterfaceCyphtWebmailTriggers extends DolibarrTriggers
 		$this->name = preg_replace('/^Interface/i', '', get_class($this));
 		$this->family = 'cyphtWebmail';
 		$this->description = 'Cleans up webmail data belonging to deleted users';
-		$this->version = '1.0';
+
+		// Same single source as the module descriptor, composer.json.
+		require_once __DIR__ . '/../../class/install/paths.class.php';
+		$cyphtVersion = (new CyphtPaths())->getModuleVersion();
+		$this->version = ($cyphtVersion !== '' ? $cyphtVersion : 'development');
 		$this->picto = 'cyphtwebmail@cyphtwebmail';
 	}
 

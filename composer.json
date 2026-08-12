@@ -2,6 +2,7 @@
     "name": "evoludata/cypht-module",
     "description": "Cypht integration for Dolibarr",
     "type": "module",
+    "license": "GPL-3.0-or-later",
     "require": {
         "jason-munro/cypht": "^2.11"
     },

@@ -121,6 +121,37 @@ class CyphtPaths
 	}
 
 	/**
+	 * The module's own version, from version.inc.php.
+	 *
+	 * @return string Empty when it cannot be read
+	 */
+	public function getModuleVersion()
+	{
+		return self::readVersionFrom($this->getModuleRoot());
+	}
+
+	/**
+	 * The same read against any module tree.
+	 *
+	 * Parsed rather than included: the packager needs the version of the tree
+	 * it exported, and including a second version.inc.php would hit the
+	 * constant this process already defined and silently return the wrong one.
+	 *
+	 * @param string $moduleRoot
+	 * @return string Empty when it cannot be read
+	 */
+	public static function readVersionFrom($moduleRoot)
+	{
+		$source = (string) @file_get_contents(rtrim($moduleRoot, '/\\') . '/version.inc.php');
+
+		if (preg_match("/define\s*\(\s*'CYPHTWEBMAIL_VERSION'\s*,\s*'([^']+)'/", $source, $m)) {
+			return $m[1];
+		}
+
+		return '';
+	}
+
+	/**
 	 * Record what this tree contains, at the module root. 
 	 *
 	 * @param string|null $cyphtVersion Defaults to what Composer reports
@@ -134,17 +165,8 @@ class CyphtPaths
 			$cyphtVersion = $this->getInstalledVersion();
 		}
 
-		$moduleVersion = null;
-		$descriptor = $root . '/core/modules/modcyphtWebmail.class.php';
-		if (is_readable($descriptor)) {
-			$source = file_get_contents($descriptor);
-			if ($source !== false && preg_match("/\\\$this->version\s*=\s*'([^']+)'/", $source, $m)) {
-				$moduleVersion = $m[1];
-			}
-		}
-
 		$info = array(
-			'module_version' => $moduleVersion,
+			'module_version' => $this->getModuleVersion(),
 			'cypht_version' => $cyphtVersion,
 			'built_at' => gmdate('c'),
 		);

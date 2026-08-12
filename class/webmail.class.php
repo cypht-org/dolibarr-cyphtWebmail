@@ -178,6 +178,12 @@ class CyphtWebmail
 	}
 
 	/** @return array<string,string>|null */
+	public function getModuleVersion()
+	{
+		return $this->paths->getModuleVersion();
+	}
+
+	/** @return array<string,string>|null */
 	public function getBuildInfo()
 	{
 		return $this->paths->getBuildInfo();
