@@ -26,9 +26,13 @@ jobs:
           # zip for ZipArchive, the rest are what Cypht's config_gen touches
           # while compiling.
           extensions: zip, mbstring, dom, curl, openssl
+          tools: composer:v2
+          coverage: none
+          ini-values: memory_limit=-1
 
       - name: Check the tag matches version.inc.php
         run: |
+          set -euo pipefail
           tag="${GITHUB_REF_NAME#v}"
           src=$(php -r 'require "version.inc.php"; echo CYPHTWEBMAIL_VERSION;')
           echo "tag=$tag  version.inc.php=$src"
@@ -38,7 +42,9 @@ jobs:
           fi
 
       - name: Install dependencies
-        run: composer install --no-interaction --no-progress
+        run: |
+          set -euo pipefail
+          composer install --no-interaction --no-progress --prefer-dist
 
       - name: Build the release archive
         run: php build/buildzip.php --out=dist
@@ -48,7 +54,9 @@ jobs:
       # verified. This only surfaces what was produced.
       - name: Show what was built
         run: |
+          set -euo pipefail
           ls -lh dist/
+          test -n "$(find dist -maxdepth 1 -name '*.zip' -print -quit)"
           sha256sum dist/*.zip | tee dist/SHA256SUMS
 
       - name: Attach it to the release
@@ -58,3 +66,4 @@ jobs:
             dist/*.zip
             dist/SHA256SUMS
           generate_release_notes: true
+          fail_on_unmatched_files: true
