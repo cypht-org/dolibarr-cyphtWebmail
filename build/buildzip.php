@@ -136,6 +136,28 @@ function cyphtPkgRun(array $cmd, $cwd)
 }
 
 /**
+ * The module's directory name, derived the way Dolibarr derives it.
+ *
+ * @param string $moduleRoot Tree to inspect
+ * @return string
+ */
+function cyphtPkgModuleName($moduleRoot)
+{
+	$found = glob($moduleRoot . '/core/modules/mod*.class.php');
+
+	if (!is_array($found) || count($found) !== 1) {
+		cyphtPkgFail('Expected exactly one core/modules/mod*.class.php to name the module after, found '
+			. (is_array($found) ? count($found) : 0) . '.');
+	}
+
+	if (!preg_match('/mod(.*)\.class\.php$/', basename($found[0]), $m)) {
+		cyphtPkgFail('Could not read a module name out of ' . basename($found[0]) . '.');
+	}
+
+	return strtolower($m[1]);
+}
+
+/**
  * Digits and dots only, because admin/modules.php:262 accepts the upload
  * against /^(module[a-zA-Z0-9]*_|theme_|).*\-([0-9][0-9\.]*)\.zip$/ and strips
  * that same pattern at :292 to find the directory inside the archive. A suffix
@@ -289,8 +311,8 @@ if ($options['version'] !== '') {
 	cyphtPkgCheckVersion($options['version']);
 }
 
-$dirName = 'cyphtwebmail';
-$work = rtrim(sys_get_temp_dir(), '/\\').'/cyphtwebmail-package-'.getmypid();
+$dirName = cyphtPkgModuleName($root);
+$work = rtrim(sys_get_temp_dir(), '/\\').'/'.$dirName.'-package-'.getmypid();
 $staging = $work.'/'.$dirName;
 
 /* Staged under the system temp directory on purpose: build.php walks up
@@ -393,9 +415,6 @@ if (!is_dir($outDir) && !mkdir($outDir, 0755, true) && !is_dir($outDir)) {
 
 $zipName = 'module_'.$dirName.'-'.$version.'.zip';
 
-/* Replay what the deployer does with the name we just built. If stripping the
- * prefix and the version does not land back on the directory inside the
- * archive, the upload fails with "wrong format". */
 $deployerSees = preg_replace('/\-([0-9][0-9\.]*)\.zip$/i', '', preg_replace('/module_/', '', $zipName));
 if ($deployerSees !== $dirName) {
 	cyphtPkgFail('Dolibarr would read "'.$zipName.'" as module "'.$deployerSees.'" and look for that directory, but the archive contains "'.$dirName.'".');
