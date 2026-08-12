@@ -136,6 +136,22 @@ function cyphtPkgRun(array $cmd, $cwd)
 }
 
 /**
+ * Digits and dots only, because admin/modules.php:262 accepts the upload
+ * against /^(module[a-zA-Z0-9]*_|theme_|).*\-([0-9][0-9\.]*)\.zip$/ and strips
+ * that same pattern at :292 to find the directory inside the archive. A suffix
+ * like 2.0-beta1 is refused at upload.
+ *
+ * @param string $version
+ * @return void
+ */
+function cyphtPkgCheckVersion($version)
+{
+	if (!preg_match('/^[0-9][0-9.]*$/', $version)) {
+		cyphtPkgFail('Version "'.$version.'" would be refused by Dolibarr. Digits and dots only: 1.0, 1.2.3.');
+	}
+}
+
+/**
  * Everything the runtime never reads, relative to the staged module root.
  *
  * The three asset packages are the bulk of it: config_gen compiles them into
@@ -150,12 +166,8 @@ function cyphtPkgPruneList()
 	$cypht = 'vendor/jason-munro/cypht/';
 
 	return array(
-		'vendor/thomaspark/bootswatch',
-		'vendor/twbs/bootstrap',
-		'vendor/twbs/bootstrap-icons',
-
-		// Build inputs and outputs inside the Cypht package. site/ is what
-		// publishSite() has already copied to public/.
+		'vendor/thomaspark',
+		'vendor/twbs',
 		$cypht.'site',
 		$cypht.'site.js',
 		$cypht.'site.css',
@@ -165,14 +177,9 @@ function cyphtPkgPruneList()
 		$cypht.'docker',
 		$cypht.'.github',
 		$cypht.'.travis',
-
-		/* Only the subdirectories: vendor/jason-munro/cypht/vendor/autoload.php
-		 * is what public/index.php requires as VENDOR_PATH.'autoload.php', so
-		 * the directory itself has to survive. */
 		$cypht.'vendor/twbs',
 		$cypht.'vendor/thomaspark',
 		$cypht.'vendor/composer',
-
 		'debug.log',
 		'last_build_log.ndjson',
 		'session_debug.log',
@@ -278,24 +285,8 @@ if (trim($dirty) !== '' && !$options['allow-dirty']) {
 	);
 }
 
-/* Names the file, nothing else. The descriptor's version is the default so a
- * plain run needs no argument, and --version covers releasing under a number
- * the descriptor does not carry yet. */
-$version = $options['version'];
-if ($version === '') {
-	$descriptor = $root.'/core/modules/modcyphtWebmail.class.php';
-	if (!preg_match("/\\\$this->version\s*=\s*'([^']+)'/", (string) file_get_contents($descriptor), $m)) {
-		cyphtPkgFail('Could not read $this->version from '.$descriptor.'; pass --version=X.Y.Z instead.');
-	}
-	$version = $m[1];
-}
-
-/* Digits and dots only, because admin/modules.php:262 accepts the upload
- * against /^(module[a-zA-Z0-9]*_|theme_|).*\-([0-9][0-9\.]*)\.zip$/ and then
- * strips that same pattern at :292 to work out which directory to look for
- * inside the archive. A suffix like 2.0-beta1 is refused at upload. */
-if (!preg_match('/^[0-9][0-9.]*$/', $version)) {
-	cyphtPkgFail('Version "'.$version.'" would be refused by Dolibarr. Digits and dots only: 1.0, 1.2.3.');
+if ($options['version'] !== '') {
+	cyphtPkgCheckVersion($options['version']);
 }
 
 $dirName = 'cyphtwebmail';
@@ -314,7 +305,7 @@ if (!mkdir($staging, 0755, true) && !is_dir($staging)) {
 
 cyphtPkgSay("== Export ==\n", $options['quiet']);
 
-list($code, $head) = cyphtPkgRun(array('git', 'log', '-1', '--format=%h %s'), $root);
+list($code, $head) = cyphtPkgRun(array('git', 'log', '-1', '--oneline'), $root);
 cyphtPkgSay('HEAD '.trim($head)."\n", $options['quiet']);
 
 $exportZip = $work.'/source.zip';
@@ -334,13 +325,28 @@ $zip->close();
 
 cyphtPkgSay('exported '.$sourceCount." tracked files from HEAD\n", $options['quiet']);
 
-// vendor/ is gitignored, so the export has none. Copied rather than installed:
-// composer.lock is committed, so this is the same tree, without the download.
-cyphtPkgSay("copying vendor/ ...\n", $options['quiet']);
-if (!is_dir($root.'/vendor/jason-munro/cypht')) {
-	cyphtPkgFail("vendor/jason-munro/cypht is missing.\nRun composer install, or php scripts/build.php --prepare, first.");
+$version = $options['version'];
+if ($version === '') {
+	$version = CyphtPaths::readVersionFrom($staging);
+	if ($version === '') {
+		cyphtPkgFail('Could not read CYPHTWEBMAIL_VERSION from the exported version.inc.php; pass --version=X.Y.Z instead.');
+	}
+	cyphtPkgCheckVersion($version);
+	cyphtPkgSay('version '.$version.", from version.inc.php\n", $options['quiet']);
+} else {
+	cyphtPkgSay('version '.$version.", from --version\n", $options['quiet']);
 }
-$files->copyRecursive($root.'/vendor', $staging.'/vendor');
+
+// vendor/ is gitignored, so the export has none.
+/* Copied when this tree has one, which turns a download into a file copy.
+ * When it does not, nothing happens here: scripts/build.php fetches its own
+ * dependencies, and it is the only thing in the module that knows how. */
+if (is_dir($root.'/vendor/jason-munro/cypht')) {
+	cyphtPkgSay("copying vendor/ ...\n", $options['quiet']);
+	$files->copyRecursive($root.'/vendor', $staging.'/vendor');
+} else {
+	cyphtPkgSay("no vendor/ to copy; the build below will fetch it\n", $options['quiet']);
+}
 
 cyphtPkgSay("\n== Build ==\n", $options['quiet']);
 
@@ -384,15 +390,12 @@ $outDir = rtrim(str_replace('\\', '/', $options['out']), '/');
 if (!is_dir($outDir) && !mkdir($outDir, 0755, true) && !is_dir($outDir)) {
 	cyphtPkgFail('Could not create the output directory at '.$outDir);
 }
-/* module_ prefix as Dolibarr's own build/buildzip.php produces, and as
- * Dolistore packages carry. admin/modules.php strips it at :291 before looking
- * for the directory, so the two spellings deploy identically; this is the
- * conventional one. */
+
 $zipName = 'module_'.$dirName.'-'.$version.'.zip';
 
 /* Replay what the deployer does with the name we just built. If stripping the
  * prefix and the version does not land back on the directory inside the
- * archive, the upload fails with "wrong format" and nothing says why. */
+ * archive, the upload fails with "wrong format". */
 $deployerSees = preg_replace('/\-([0-9][0-9\.]*)\.zip$/i', '', preg_replace('/module_/', '', $zipName));
 if ($deployerSees !== $dirName) {
 	cyphtPkgFail('Dolibarr would read "'.$zipName.'" as module "'.$deployerSees.'" and look for that directory, but the archive contains "'.$dirName.'".');
@@ -437,7 +440,7 @@ if ($zip->open($zipPath) === true) {
 }
 
 if (count($problems) > 0) {
-	// @unlink($zipPath);
+	@unlink($zipPath);
 	
 	cyphtPkgFail("The archive was rejected and deleted:\n  - ".implode("\n  - ", $problems));
 }
