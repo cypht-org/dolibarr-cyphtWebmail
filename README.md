@@ -27,7 +27,7 @@ Cypht is LGPL-2.1, Dolibarr is GPL-3.0. This module is GPL-3.0.
 
 | Feature | Notes |
 |---|---|
-| Embedded webmail | Cypht runs inside a Dolibarr page, with Dolibarr's menu and header |
+| Embedded webmail | The built Cypht application is embedded inside the Dolibarr interface, with Dolibarr's menu and header |
 | Single sign-on | Dolibarr users reach their mail without a second login |
 | Dolibarr contacts in Cypht | Third parties and contacts appear as a read-only address book, including compose autocomplete |
 | Accounts in the database | Mail accounts and settings live in `llx_cyphtwebmail_userconfig`, not in files |
@@ -43,150 +43,83 @@ To run it:
 - PHP 8.0+ with `curl`, `openssl`, `mbstring`, `dom`, `PDO`
 - MySQL/MariaDB or PostgreSQL (whatever Dolibarr already uses)
 
-To build it, additionally:
-
-- a **PHP CLI binary**, which the build invokes to run Cypht's `config_gen.php`
-- **Composer**, or a `composer.phar` in the module root, or a `vendor/` that was
-  prepared elsewhere
+To build:
+- PHP CLI binary
+- Composer (or `composer.phar` in module root)
 - `proc_open()` and `exec()` enabled
-
-Only whichever side runs the build needs those three. Shared hosting often
-disables `proc_open()` for the webserver, which is why the build can also be run
-from a terminal.
 
 ## Installation
 
-### 1. Put the module in an external modules directory
+### From a release ZIP
 
-The module goes in one of Dolibarr's external module directories, set by
-`$dolibarr_main_document_root_alt` in `<dolibarr>/htdocs/conf/conf.php`:
+1. Download `module_cyphtwebmail-x.y.z.zip` from releases
+2. Extract into Dolibarr's custom directory (set by `$dolibarr_main_document_root_alt`):
+   ```bash
+   unzip module_cyphtwebmail-x.y.z.zip -d <dolibarr>/htdocs/custom/
+   ```
+3. The ZIP contains pre-built `vendor/` and `public/` — no build step needed
+4. Enable: **Home → Setup → Modules/Applications → Interfaces** → **CyphtWebmail** → switch on
 
-```php
-$dolibarr_main_document_root_alt = '/path/to/dolibarr/htdocs/custom';
-```
+### From git (source)
 
-Clone or copy it there:
+1. Clone into Dolibarr's custom directory:
+   ```bash
+   git clone <repository-url> <dolibarr>/htdocs/custom/cyphtWebmail
+   ```
+2. Build the module (see next section)
+3. Enable: **Home → Setup → Modules/Applications → Interfaces** → **CyphtWebmail** → switch on
 
-```bash
-cd dolibarr/.../<your external modules directory>
-git clone <repository-url> cyphtWebmail
-```
 
-If the module is not in the tree below Dolibarr, `scripts/build.php` cannot find
-it on its own; pass `--dolibarr=/path/to/htdocs`. See
-[Building from the command line](#building-from-the-command-line).
 
-A release archive contains `vendor/` and a compiled `public/` already. That is
-what makes it installable without a toolchain; see
-[Packaging a release](#packaging-a-release).
+## Setup and Building
 
-### 2. Enable the module
+### Installing from git
 
-**Home → Setup → Modules/Applications → Interfaces**, find **CyphtWebmail**,
-switch it on.
+Source requires compilation. Two workflows:
 
-Enabling creates the database tables, registers the triggers and adds the menu
-entries. The build does none of that, so this step cannot be skipped.
-
-That is the whole installation. Releases ship already compiled, so there is no
-Composer step, no command line, and nothing to build.
-
-### If you installed from git instead
-
-A clone gives you source rather than a release, so it does have to be compiled
-once:
+#### Build for testing locally
 
 ```bash
 cd <module directory>
 php scripts/build.php
 ```
 
-This needs a PHP CLI binary and either Composer or a prepared `vendor/`. It is
-the same command the release process runs, and it does not need Dolibarr.
+**Or via web UI:** **CyphtWebmail → Module setup**, press **Generate**.
 
-## Setup
+Build steps:
+1. `composer install` - fetches Cypht
+2. `config_gen.php` - compiles module sets
+3. publish - copies to `public/` with paths rewritten for relocatability
 
-### The setup page
+Rebuild after: module changes, setup page changes, `cypht/modules/` edits, or `composer update`.
 
-**CyphtWebmail → Module setup**, or directly:
+Options: `--dolibarr=PATH`, `--owner=USER`, `--group=GROUP`, `--skip-permissions`, `--quiet`.
 
-```
-/custom/cyphtWebmail/admin/setup.php
-```
+#### Packaging for release
 
-This is where everything is configured. It has:
-
-- **IMAP defaults** - name, server, port, TLS for the default account form
-- **Cypht build status** - installed and built versions, last build date
-- **Maintenance** - the Generate button and its log, shown only when Dolibarr
-  is not in production mode. Releases ship compiled, so an ordinary
-  installation never sees it. Set `CYPHTWEBMAIL_ENABLE_BUILD` to force it on
-
-### Press Generate
-
-Generate runs three steps and streams the log:
-
-1. `composer install` - fetches/updates Cypht
-2. `vendor/jason-munro/cypht/scripts/config_gen.php` - Cypht compiles its
-   enabled module sets into `config/dynamic.php` plus bundled `site.css` /
-   `site.js`. This is Cypht's own script, not the module's `scripts/build.php`
-3. **publish** - copies the built `site/` into `public/`, which is what the
-   browser actually loads
-
-Before step 2 the module also writes Cypht's `.env` from Dolibarr's settings,
-bridges the flat Composer layout, and installs its own Cypht module sets.
-
-**Build again after:**
-
-- installing or updating the module
-- changing anything on the setup page
-- editing anything under `cypht/modules/`
-- running `composer update`
-
-### Building from the command line
-
-`php scripts/build.php` does the same three steps without a browser. When the
-webserver cannot build, the setup page shows this command in place of the
-button.
-
-| Option | What it does |
-|---|---|
-| `--prepare` | dependencies and module sets only, no Dolibarr needed. For packaging |
-| `--dolibarr=PATH` | where Dolibarr lives, if this module sits outside its tree. Takes the `htdocs` folder, the install root, or `master.inc.php` itself |
-| `--owner=USER` / `--group=GROUP` | chown/chgrp the writable paths afterwards (POSIX only) |
-| `--skip-permissions` | leave ownership and modes alone |
-| `--quiet` | errors and the final result only |
-
-Run it as the webserver user, or pass `--owner`. A build run as yourself leaves
-files the webserver cannot write, and that fails later, far from the cause.
-
-### Packaging a release
-
-A compiled build is portable. `config_gen.php` bakes the build machine's own
-directory into `public/index.php`, so the publish step rewrites that one
-`define()` to locate itself instead, and `config/dynamic.php` contains no paths
-at all. Nothing else in the build output names the machine that produced it.
-
-Build the release from a bare clone, with no Dolibarr present:
+`php build/buildzip.php` packages the module into a ZIP for distribution. It runs
+the full build internally, then verifies secrets are not included:
 
 ```bash
-php scripts/build.php      # then zip the tree
+php build/buildzip.php --out=dist
 ```
 
-Name the archive `cyphtwebmail-x.y.z.zip`, with the module directory at the
-root, so Dolibarr's *Deploy external module* screen accepts it. The version has
-to be the last thing before `.zip` or the upload is rejected.
+This creates `dist/module_cyphtwebmail-x.y.z.zip`.
 
-**Check what the archive contains before publishing it.** The `.env` inside a
-release must hold only the build defaults, roughly a dozen keys that are the
-same on every installation. It must never carry `DB_PASS`,
-`SSO_SHARED_SECRET` or `USER_CONFIG_SECRET`: those belong to an installation,
-not to a build, and the second of them decrypts every stored mailbox password.
-An offline build writes only the defaults, but a tree that has also been built
-against a live Dolibarr will have the rest sitting in the same file.
+**Verification:**
+```bash
+unzip -l dist/module_cyphtwebmail-x.y.z.zip | grep -E '\.env|\.git'
+```
 
-`.gitignore` keeps `vendor/` and `public/` out of git, and a zip does not read
-`.gitignore`, so the check is worth doing by hand.
+The `.env` must contain only build defaults. Verify `DB_PASS`, `SSO_SHARED_SECRET`,
+and `USER_CONFIG_SECRET` are absent (presence means secrets leaked into the package).
+
+
+
+### Configuration
+
+**CyphtWebmail → Module setup** shows IMAP defaults, build status, and the
+Generate button (dev mode only).
 
 ### Reactivate after descriptor changes
 
@@ -197,14 +130,9 @@ or the changes will not appear.
 
 ## Daily use
 
-Open **CyphtWebmail** in the top menu. SSO logs you into Cypht automatically.
+Open **CyphtWebmail** in the top menu. SSO logs in automatically.
 
-First time, add a mailbox: **Servers** inside Cypht → *Add an E-mail Account*.
-Cypht supports IMAP, JMAP and EWS for reading, SMTP for sending.
-
-The left column carries the Dolibarr side of the workflow - open tickets,
-overdue invoices, agenda, the email collector, email templates, mass emailing
-and module setup. It deliberately does not repeat Cypht's own navigation.
+First time: **Servers** → *Add an E-mail Account*
 
 ## Where data is stored
 
@@ -226,6 +154,8 @@ SELECT u.login, c.config
 FROM llx_cyphtwebmail_userconfig c
 JOIN llx_user u ON u.rowid = c.fk_user;
 ```
+
+(Exact syntax may vary depending on whether your database is MySQL/MariaDB or PostgreSQL.)
 
 **Mail itself is never stored locally.** It stays on the IMAP server.
 
@@ -252,34 +182,38 @@ a form field.
 | `CYPHTWEBMAIL_CONTACTS_INSECURE` | `false` | skip TLS verification (self-signed certs) |
 | `CYPHTWEBMAIL_BRIDGE_URL` | auto | override when Dolibarr cannot reach itself by its public URL |
 
-**No need to edit `vendor/jason-munro/cypht/.env` by hand** - Generate rewrites it.
 
 ## Troubleshooting
 
 **Build stops partway with no error.**
-Look at `debug.log` and `last_build_log.ndjson` in the module root. The most
-common cause is PHP's execution limit; the build sets `set_time_limit(0)` and
-`ignore_user_abort(true)`, but a hard server limit still wins.
+Check `debug.log` and `last_build_log.ndjson`. Usually PHP execution limit is the culprit.
 
 **"A build is already running" and none is.**
-A crashed build left `documents/cyphtWebmail/build.lock` behind. It is ignored
-automatically after 420 seconds, or delete it.
+Delete `documents/cyphtWebmail/build.lock` (auto-ignored after 420s).
 
 **Menu entries or permissions did not change.**
-Deactivate and reactivate; see
-[Reactivate after descriptor changes](#reactivate-after-descriptor-changes).
+Deactivate and reactivate the module.
 
 **Changes under `cypht/modules/` have no effect.**
 Build again. Those files are copied into Cypht at build time.
 
-**Contacts do not appear.**
-Open `bridge/contacts.php` directly in a browser - it should answer
-`{"error":"Missing login or token"}`. Anything else (404, 500, a login page)
-means the endpoint itself is the problem. Remember the 300-second cache.
+## Security
 
-**Cypht settings vanish, or the mailbox password stops working.**
-Check `CYPHTWEBMAIL_CONFIG_SECRET` still exists in `llx_const`. If it changed,
-stored passwords cannot be decrypted and are blanked so Cypht re-prompts.
+**Encryption keys**
+- `CYPHTWEBMAIL_CONFIG_SECRET` encrypts stored mailbox passwords. Never change it
+  casually; doing so renders all stored passwords unreadable.
+- `CYPHTWEBMAIL_SSO_SECRET` signs authentication and bridge tokens. Changing it
+  invalidates active sessions.
+
+**Production deployments**
+- Never expose `CYPHTWEBMAIL_SESSION_DEBUG` or database credentials in logs.
+- Release ZIPs contain only build-time defaults (no secrets); production config
+  must be added during installation.
+
+
+
+**Cypht settings vanish or password stops working.**
+Check if `CYPHTWEBMAIL_CONFIG_SECRET` changed in `llx_const`—if so, passwords need re-entry.
 
 **Sessions pile up.**
 Garbage collection is probabilistic. Lower `CYPHTWEBMAIL_SESSION_GC_DIVISOR` to
@@ -295,7 +229,7 @@ Everything about changing this module lives in
 together, how to add a Cypht module set or a bridge endpoint, the coding
 conventions, and the checklist to run before opening a PR.
 
-## Licence
+## License
 
 This module is free software under the GNU General Public License, either
 version 3 or, at your option, any later version. The full text is in
