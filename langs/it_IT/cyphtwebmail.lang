@@ -1,0 +1,63 @@
+ModulecyphtWebmailName = CyphtWebmail
+cyphtWebmailDescription = Cypht webmail integrato in Dolibarr
+
+CyphtWebmailSetup = Configurazione CyphtWebmail
+Settings = Impostazioni
+CyphtWebmailSetupPage = Pagina di configurazione CyphtWebmail
+NewSection = Nuova sezione
+
+CyphtWebmailImapName = Etichetta server IMAP
+CyphtWebmailImapServer = Nome host server IMAP
+CyphtWebmailImapPort = Porta server IMAP
+CyphtWebmailImapTls = Usa TLS
+
+CyphtWebmailBuildStatus = Stato compilazione Cypht
+CyphtWebmailInstalledVersion = Versione Cypht installata (vendor/)
+CyphtWebmailBuiltVersion = Versione Cypht compilata
+CyphtWebmailLastBuild = Data ultima compilazione
+CyphtWebmailNeverBuilt = Mai compilato
+CyphtWebmailNotInstalled = Non installato - eseguire "composer install" nella directory del modulo
+CyphtWebmailUpdateAvailable = Aggiornamento disponibile: la versione %s è installata ma non ancora compilata - fare clic su Genera per ricompilare
+CyphtWebmailUpToDate = Aggiornato
+CyphtWebmailGenerateButton = Genera / Ricompila configurazione Cypht
+CyphtWebmailBuilding = Compilazione in corso... potrebbe richiedere un minuto, attendere
+CyphtWebmailCancelButton = Annulla compilazione
+CyphtWebmailCancelling = Annullamento...
+CyphtWebmailBuildLog = Log di compilazione
+CyphtWebmailShowLog = Mostra log di compilazione
+CyphtWebmailHideLog = Nascondi log di compilazione
+CyphtWebmailBuildSuccess = Configurazione Cypht compilata e pubblicata con successo
+CyphtWebmailBuildFailed = Compilazione configurazione Cypht fallita
+SetupSaved = Impostazioni salvate
+
+CyphtWebmailNotYetBuilt = Cypht non è ancora stato compilato.
+CyphtWebmailGoToSetup = Vai alla configurazione per generarlo
+
+About = Informazioni
+CyphtWebmailAbout = Informazioni su CyphtWebmail
+CyphtWebmailAboutPage = Pagina informazioni su CyphtWebmail
+
+CyphtWebmailArea = Home CyphtWebmail
+MyPageName = Nome della mia pagina
+
+MyWidget = Il mio widget
+MyWidgetDescription = Descrizione del mio widget
+
+CyphtMenuWebmail = Webmail
+CyphtMenuOpenTickets = Ticket aperti
+CyphtMenuOverdueInvoices = Fatture scadute
+CyphtMenuTodayAgenda = Agenda
+CyphtMenuEmailCollector = Collettore email
+CyphtMenuEmailTemplates = Modelli email
+CyphtMenuMassEmailing = Invio email di massa
+CyphtMenuModuleSetup = Configurazione modulo
+
+CyphtWebmailCannotBuildHere = Questo server non può compilare dal browser.
+CyphtWebmailBuildFromShell = Eseguire la compilazione da un terminale:
+CyphtWebmailRebuildFromShell = Cypht è compilato e in esecuzione. Questo server non può ricompilare dal browser; per ricompilare, eseguire questo dalla cartella del modulo:
+
+CyphtWebmailMaintenance = Manutenzione
+CyphtWebmailMaintenanceHint = Strumenti per sviluppatori. Le versioni rilasciate vengono già compilate, quindi è necessario ricompilare solo dopo aver modificato qualcosa sotto cypht/modules/.
+
+CyphtWebmailModuleVersion = Versione modulo
+CyphtWebmailVersionMismatch = compilato con %s, ma %s è installato. Ricompilare o reinstallare la versione.

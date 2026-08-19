@@ -1,17 +1,7 @@
-# Translation file
-
-#
-# Generic
-#
-
-# Module label - key must match 'titre' in the descriptor's $this->menu entry exactly (case-sensitive)
 ModulecyphtWebmailName = CyphtWebmail
-# Module description - key must match $this->description in the descriptor exactly (case-sensitive)
+
 cyphtWebmailDescription = Cypht webmail integrated into Dolibarr
 
-#
-# Admin page
-#
 CyphtWebmailSetup = CyphtWebmail setup
 Settings = Settings
 CyphtWebmailSetupPage = CyphtWebmail setup page
@@ -44,27 +34,16 @@ SetupSaved = Settings saved
 CyphtWebmailNotYetBuilt = Cypht has not been built yet.
 CyphtWebmailGoToSetup = Go to setup to generate it
 
-
-#
-# About page
-#
 About = About
 CyphtWebmailAbout = About CyphtWebmail
 CyphtWebmailAboutPage = CyphtWebmail about page
 
-#
-# Sample page
-#
 CyphtWebmailArea = Home CyphtWebmail
 MyPageName = My page name
 
-#
-# Sample widget
-#
 MyWidget = My widget
 MyWidgetDescription = My widget description
 
-# Left menu (see core/modules/modcyphtWebmail.class.php)
 CyphtMenuWebmail=Webmail
 CyphtMenuOpenTickets=Open tickets
 CyphtMenuOverdueInvoices=Overdue invoices
@@ -74,19 +53,12 @@ CyphtMenuEmailTemplates=Email templates
 CyphtMenuMassEmailing=Mass emailing
 CyphtMenuModuleSetup=Module setup
 
-
-# Build preflight (admin/setup.php)
 CyphtWebmailCannotBuildHere=This server cannot build from the browser.
 CyphtWebmailBuildFromShell=Run the build from a terminal instead:
 CyphtWebmailRebuildFromShell=Cypht is built and running. This server cannot rebuild it from the browser; to rebuild, run this from the module folder:
 
-# Maintenance section on the setup page. The build controls only appear in
-# developer mode: releases ship precompiled, so an ordinary installation never
-# compiles anything.
 CyphtWebmailMaintenance = Maintenance
 CyphtWebmailMaintenanceHint = Developer tools. Releases ship already compiled, so rebuilding is only needed after changing anything under cypht/modules/.
 
-# Version reporting. build.json is written by the build and ships with it, so
-# it is the only source a prebuilt release has for these.
 CyphtWebmailModuleVersion = Module version
 CyphtWebmailVersionMismatch = built against %s, but %s is installed. Rebuild, or reinstall the release.
