@@ -19,6 +19,7 @@ require_once __DIR__ . '/../install/paths.class.php';
 require_once __DIR__ . '/../auth/token.class.php';
 require_once __DIR__ . '/../integration/contactsource.class.php';
 require_once __DIR__ . '/../integration/mailtemplatesource.class.php';
+require_once __DIR__ . '/../integration/contextsource.class.php';
 
 /**
  * \file        class/install/environment.class.php
@@ -75,9 +76,11 @@ class CyphtEnvironment
 			'ENABLE_DEBUG'     => 'false',
 			'DEFAULT_LANGUAGE' => 'en',
 			// Order matters: dolibarr_contacts must follow "contacts", whose
-			// load_contacts handler it attaches to. Omitting a module set here
-			// means config_gen.php never scans its setup.php.
-			'CYPHT_MODULES'    => 'core,contacts,dolibarr_contacts,dolibarr_mail_templates,imap,smtp,api_login,account,nux,developer,history,saved_searches,advanced_search,profiles,inline_message,imap_folders,keyboard_shortcuts,site,dynamic_login,sievefilters,themes',
+			// load_contacts handler it attaches to, and dolibarr_context must
+			// follow "imap", whose filter_message_headers output it appends
+			// to. Omitting a module set here means config_gen.php never scans
+			// its setup.php.
+			'CYPHT_MODULES'    => 'core,contacts,dolibarr_contacts,dolibarr_mail_templates,imap,dolibarr_context,smtp,api_login,account,nux,developer,history,saved_searches,advanced_search,profiles,inline_message,imap_folders,keyboard_shortcuts,site,dynamic_login,sievefilters,themes',
 			'DISABLE_FINGERPRINT' => 'true',
 			'DISABLE_EMPTY_SUPERGLOBALS' => 'true',
 			'DISABLE_OPEN_BASE_DIR' => 'true',
@@ -131,6 +134,16 @@ class CyphtEnvironment
 			'DOLIBARR_MAIL_TEMPLATES_TTL' => getDolGlobalString('CYPHTWEBMAIL_MAIL_TEMPLATES_TTL', '900'),
 			'DOLIBARR_MAIL_TEMPLATES_TIMEOUT' => getDolGlobalString('CYPHTWEBMAIL_MAIL_TEMPLATES_TIMEOUT', '5'),
 			'DOLIBARR_MAIL_TEMPLATES_INSECURE' => getDolGlobalString('CYPHTWEBMAIL_MAIL_TEMPLATES_INSECURE', 'false'),
+			'DOLIBARR_CONTEXT_URL' => CyphtContextSource::resolveBridgeUrl(),
+			// Much shorter than the other two: an unpaid invoice being settled
+			// while a mailbox is open is exactly the change this panel exists
+			// to reflect, so a stale card is worse here than a second request.
+			'DOLIBARR_CONTEXT_TTL' => getDolGlobalString('CYPHTWEBMAIL_CONTEXT_TTL', '120'),
+			// Cards are cached per address. Without a ceiling, reading down a
+			// long folder would add one to the session file per message.
+			'DOLIBARR_CONTEXT_CACHE' => getDolGlobalString('CYPHTWEBMAIL_CONTEXT_CACHE', '20'),
+			'DOLIBARR_CONTEXT_TIMEOUT' => getDolGlobalString('CYPHTWEBMAIL_CONTEXT_TIMEOUT', '5'),
+			'DOLIBARR_CONTEXT_INSECURE' => getDolGlobalString('CYPHTWEBMAIL_CONTEXT_INSECURE', 'false'),
 			// Opened with target="_top" so it escapes the webmail iframe.
 			'DOLIBARR_NEW_CONTACT_URL' => dol_buildpath('/contact/card.php', 2) . '?action=create',
 		));
