@@ -1,0 +1,30 @@
+/**
+ * Dolibarr card in the message view.
+ *
+ * Scoped to the panel so no other chip or outline button on the site is
+ * affected.
+ */
+.dolibarr_context .btn-outline-secondary {
+    --bs-btn-font-size: 0.8125rem;
+    --bs-btn-border-color: var(--bs-border-color);
+}
+
+.dolibarr_context .btn-outline-secondary.active {
+    --bs-btn-active-bg: var(--bs-secondary-bg);
+    --bs-btn-active-color: var(--bs-body-color);
+    --bs-btn-active-border-color: var(--bs-border-color);
+}
+
+/* A long company name or a document reference is one unbroken word often
+ * enough that letting it set the panel's width would push the message body
+ * sideways. */
+.dolibarr_context_body {
+    overflow-wrap: anywhere;
+}
+
+/* Kept short: this sits above the message, and expanding a chip must not
+ * scroll the mail off the screen. */
+.dolibarr_context_rows {
+    max-height: 12rem;
+    overflow-y: auto;
+}
