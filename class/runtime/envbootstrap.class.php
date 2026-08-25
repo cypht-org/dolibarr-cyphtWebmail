@@ -229,6 +229,7 @@ class CyphtEnvBootstrap
 			'DOLIBARR_CONTACTS_URL' => $moduleUrl . '/bridge/contacts.php',
 			'DOLIBARR_MAIL_TEMPLATES_URL' => $moduleUrl . '/bridge/mail_templates.php',
 			'DOLIBARR_CONTEXT_URL' => $moduleUrl . '/bridge/context.php',
+			'DOLIBARR_CONTEXT_CREATE_URL' => $moduleUrl . '/bridge/create.php',
 			'DOLIBARR_NEW_CONTACT_URL' => $conf['url_root'] . '/contact/card.php?action=create',
 		);
 	}
@@ -291,6 +292,7 @@ class CyphtEnvBootstrap
 			'CYPHTWEBMAIL_BRIDGE_URL' => 'DOLIBARR_CONTACTS_URL',
 			'CYPHTWEBMAIL_BRIDGE_MAIL_TEMPLATES_URL' => 'DOLIBARR_MAIL_TEMPLATES_URL',
 			'CYPHTWEBMAIL_BRIDGE_CONTEXT_URL' => 'DOLIBARR_CONTEXT_URL',
+			'CYPHTWEBMAIL_BRIDGE_CONTEXT_CREATE_URL' => 'DOLIBARR_CONTEXT_CREATE_URL',
 		);
 
 		$pdo = $this->connect($conf);
