@@ -1,9 +1,4 @@
-/**
- * Dolibarr card in the message view.
- *
- * Scoped to the panel so no other chip or outline button on the site is
- * affected.
- */
+/* Dolibarr card in the message view. */
 .dolibarr_context .btn-outline-secondary {
     --bs-btn-font-size: 0.8125rem;
     --bs-btn-border-color: var(--bs-border-color);
@@ -15,16 +10,35 @@
     --bs-btn-active-border-color: var(--bs-border-color);
 }
 
-/* A long company name or a document reference is one unbroken word often
- * enough that letting it set the panel's width would push the message body
- * sideways. */
+/* A long company name is one unbroken word; do not let it widen the row. */
 .dolibarr_context_body {
     overflow-wrap: anywhere;
 }
 
-/* Kept short: this sits above the message, and expanding a chip must not
- * scroll the mail off the screen. */
+/* Kept short: expanding a chip must not push the message off screen. */
 .dolibarr_context_rows {
     max-height: 12rem;
     overflow-y: auto;
+}
+
+/* Reads as a heading, not as the first words of the line beneath. */
+.dolibarr_context_caption {
+    font-size: 0.6875rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+/* On the From row: a rule down the left separates sender from records. */
+.dolibarr_context_inline {
+    display: inline-block;
+    vertical-align: baseline;
+    margin-left: 0.5rem;
+    padding-left: 0.5rem;
+    border-left: 1px solid var(--bs-border-color);
+    max-width: 100%;
+}
+
+/* The caption only renders in the fallback position. */
+.dolibarr_context_inline .dolibarr_context_caption {
+    display: none;
 }
