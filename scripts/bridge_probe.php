@@ -20,28 +20,6 @@
  * \ingroup     cyphtWebmail
  * \brief       Calls a bridge endpoint the way Cypht calls it, from the
  *              command line.
- *
- *              A bridge fault and a Cypht fault look identical from the
- *              webmail: an empty panel. This mints the same signed token the
- *              module set mints, calls the same URL, and prints what came
- *              back, so the two can be told apart before any of the browser
- *              is involved.
- *
- *              Run it against the *deployed* copy under Dolibarr's custom
- *              directory, not the source tree: the source tree has no .env,
- *              because the secret and the URLs are written at build time.
- *
- * Usage:
- *   php scripts/bridge_probe.php --endpoint=context --login=admin --email=a@b.com
- *   php scripts/bridge_probe.php --endpoint=contacts --login=admin
- *   php scripts/bridge_probe.php --endpoint=templates --login=admin
- *
- *   --url-only   print the signed URL and stop, to paste into a browser
- *   --raw        print the response body exactly as it arrived
- *
- * A token is good for 60 seconds. A URL printed with --url-only and pasted a
- * minute later is expected to answer "Token expired"; that is the anti-replay
- * window working, not a fault.
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -50,9 +28,7 @@ if (PHP_SAPI !== 'cli') {
 }
 
 /**
- * Endpoints, each with the .env key holding its URL and the purpose tag that
- * has to be inside its signature. The tag is what stops a token minted for one
- * endpoint being replayed against another, so it is per endpoint by design.
+ * Endpoints, each with the environment key holding its URL and the purpose tag
  */
 $endpoints = array(
 	'contacts' => array(
@@ -77,7 +53,6 @@ $endpoints = array(
 
 /**
  * Read --key=value arguments into an array.
- *
  * @param array $argv Raw arguments
  * @return array<string,string>
  */
@@ -100,39 +75,57 @@ function probeArgs($argv)
 }
 
 /**
- * Parse a .env file into key/value pairs. Deliberately small: this only has to
- * read the file this module writes, which never quotes or continues lines.
- *
- * @param string $path Path to the .env
- * @return array<string,string>|null Null when unreadable
+ * One environment value, however CyphtEnvBootstrap happened to publish it.
+ * @param string $key Environment key
+ * @return string Empty when unset
  */
-function probeEnv($path)
+function probeEnv($key)
 {
-	if (!is_readable($path)) {
-		return null;
+	if (array_key_exists($key, $_ENV) && $_ENV[$key] !== '') {
+		return (string) $_ENV[$key];
 	}
 
-	$lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-	if ($lines === false) {
-		return null;
-	}
+	$value = getenv($key);
 
-	$env = array();
-	foreach ($lines as $line) {
-		$line = trim($line);
-		if ($line === '' || $line[0] === '#') {
-			continue;
-		}
-		if (!preg_match('/^([A-Z0-9_]+)=(.*)$/', $line, $m)) {
-			continue;
-		}
-		$env[$m[1]] = trim($m[2], "\"'");
-	}
-
-	return $env;
+	return ($value === false) ? '' : (string) $value;
 }
 
 $args = probeArgs($argv);
+
+$moduleRoot = dirname(__DIR__);
+
+$bootstrapPath = $moduleRoot.'/class/runtime/envbootstrap.class.php';
+if (!is_readable($bootstrapPath)) {
+	print "Could not read ".$bootstrapPath."\n";
+	print "Run this from inside the module, deployed under Dolibarr's custom directory.\n";
+	exit(1);
+}
+
+require_once $bootstrapPath;
+
+$bootstrap = new CyphtEnvBootstrap($moduleRoot);
+$ready = $bootstrap->apply();
+
+if (!$ready) {
+	print "CyphtEnvBootstrap could not finish.\n\n";
+	print "  ".($bootstrap->error !== '' ? $bootstrap->error : 'No detail reported.')."\n\n";
+	print "Everything per installation, the shared secret included, is read\n";
+	print "from Dolibarr at request time rather than written into the built\n";
+	print ".env. If this cannot reach conf.php or the database, neither can\n";
+	print "the webmail, and that is the fault to fix first.\n";
+	exit(1);
+}
+
+if (isset($args['env'])) {
+	$secret = probeEnv('SSO_SHARED_SECRET');
+	print "resolved configuration\n\n";
+	print "  SSO_SHARED_SECRET  ".($secret !== '' ? strlen($secret)." chars" : "MISSING")."\n";
+	foreach ($endpoints as $name => $spec) {
+		$url = probeEnv($spec['url_key']);
+		printf("  %-18s %s\n", $name, ($url !== '' ? $url : 'MISSING ('.$spec['url_key'].')'));
+	}
+	exit(0);
+}
 
 $name = isset($args['endpoint']) ? $args['endpoint'] : 'context';
 if (!isset($endpoints[$name])) {
@@ -153,32 +146,21 @@ if ($name === 'context' && $email === '') {
 	exit(1);
 }
 
-// The .env is written into the vendored Cypht at build time, which is the only
-// place both the secret and the resolved URLs exist together.
-$moduleRoot = dirname(__DIR__);
-$envPath = $moduleRoot.'/vendor/jason-munro/cypht/.env';
-$env = probeEnv($envPath);
-
-if ($env === null) {
-	print "Could not read ".$envPath."\n\n";
-	print "Either this is the source tree rather than the deployed module, or\n";
-	print "the build has not run yet, or the file is owned by the web server\n";
-	print "user and this shell is not it.\n";
-	exit(1);
-}
-
-$secret = isset($env['SSO_SHARED_SECRET']) ? $env['SSO_SHARED_SECRET'] : '';
+$secret = probeEnv('SSO_SHARED_SECRET');
 if ($secret === '') {
-	print "SSO_SHARED_SECRET is missing from ".$envPath.". Run the build.\n";
+	print "SSO_SHARED_SECRET is not set after bootstrap.\n\n";
+	print "It lives in the module's own config table, written when the module\n";
+	print "was activated. Switch the module off and on again if it is missing.\n";
 	exit(1);
 }
 
-$url = isset($env[$endpoint['url_key']]) ? $env[$endpoint['url_key']] : '';
+$url = probeEnv($endpoint['url_key']);
 if ($url === '') {
-	print $endpoint['url_key']." is missing from ".$envPath.".\n\n";
-	print "For a module set added since the last build, this is the expected\n";
-	print "symptom: the key is written by CyphtEnvironment, so it appears only\n";
-	print "after the build has run again.\n";
+	print $endpoint['url_key']." is not set after bootstrap.\n\n";
+	print "For an endpoint added since the module was last deployed, this is\n";
+	print "the expected symptom: the key is published by CyphtEnvBootstrap, so\n";
+	print "it appears only once the updated class/runtime/envbootstrap.class.php\n";
+	print "is the one being read.\n";
 	exit(1);
 }
 
@@ -214,13 +196,13 @@ if (!function_exists('curl_init')) {
 	exit(1);
 }
 
-$timeout = isset($env[$endpoint['timeout_key']]) ? (int) $env[$endpoint['timeout_key']] : 5;
+$timeout = (int) probeEnv($endpoint['timeout_key']);
 
 $ch = curl_init($signed);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_TIMEOUT, $timeout > 0 ? $timeout : 5);
 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
-if (isset($env[$endpoint['insecure_key']]) && $env[$endpoint['insecure_key']] === 'true') {
+if (probeEnv($endpoint['insecure_key']) === 'true') {
 	curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 	curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
 }
@@ -260,8 +242,7 @@ if ($status !== 200) {
 	exit(1);
 }
 
-// A short reading of the answer, since the interesting failures are all 200s:
-// the endpoint worked and still found nothing.
+// The interesting failures are 200s, so read the answer out.
 if ($name === 'context') {
 	if (empty($decoded['match'])) {
 		print "\nNo Dolibarr record owns that address. The panel will say so.\n";
