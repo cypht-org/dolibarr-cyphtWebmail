@@ -1,28 +1,8 @@
 'use strict';
 
-/**
- * Dolibarr card under the headers of an open message.
- *
- * The message response carries an empty shell with the sender's address on it.
- * This file spots that shell, asks ajax_dolibarr_context who the address is,
- * and draws a summary line: the third party, then one chip per thing still
- * open against them. A chip expands to the few most recent records.
- *
- * Every value drawn here comes from Dolibarr and is written with textContent,
- * never interpolated into HTML. Links carry target="_top" because Cypht runs
- * in an iframe inside Dolibarr, and without it a third party card would open
- * nested inside the webmail pane.
- *
- * This file is concatenated into the bundled site.js by config_gen.php, which
- * means it loads on every page. Every entry point therefore has to tolerate
- * the shell being absent.
- */
+/* Dolibarr card on the From row of an open message. */
 
-/**
- * The last card drawn, so opening a message whose response was replayed from
- * local storage before the server copy landed draws twice from memory rather
- * than asking Dolibarr twice for the same address.
- */
+/* Last card drawn, so a message rendered twice does not fetch twice. */
 var dolibarr_context_state = {
     email: null,
     data: null,
@@ -32,20 +12,74 @@ var dolibarr_context_state = {
 
 var dolibarr_context_strings = function(root) {
     return {
+        caption: root.getAttribute('data-str-caption') || '',
+        empty: root.getAttribute('data-str-empty') || '',
         loading: root.getAttribute('data-str-loading') || '',
-        unknown: root.getAttribute('data-str-unknown') || '',
         failed: root.getAttribute('data-str-failed') || '',
+        retry: root.getAttribute('data-str-retry') || '',
         stale: root.getAttribute('data-str-stale') || '',
         open: root.getAttribute('data-str-open') || '',
         more: root.getAttribute('data-str-more') || '',
         details: root.getAttribute('data-str-details') || '',
         customer: root.getAttribute('data-str-customer') || '',
-        supplier: root.getAttribute('data-str-supplier') || ''
+        supplier: root.getAttribute('data-str-supplier') || '',
+        add: root.getAttribute('data-str-add') || '',
+        addWhy: root.getAttribute('data-str-add-why') || '',
+        addTitle: root.getAttribute('data-str-add-title') || '',
+        addName: root.getAttribute('data-str-add-name') || '',
+        addHint: root.getAttribute('data-str-add-hint') || '',
+        addSave: root.getAttribute('data-str-add-save') || '',
+        addWorking: root.getAttribute('data-str-add-working') || '',
+        addDone: root.getAttribute('data-str-add-done') || '',
+        addExisting: root.getAttribute('data-str-add-existing') || '',
+        addFailed: root.getAttribute('data-str-add-failed') || '',
+        addOpen: root.getAttribute('data-str-add-open') || ''
     };
+};
+
+/* The display name on the open message's From line, for prefilling the create dialog. */
+var dolibarr_context_sender_name = function() {
+    var el = document.querySelector('.msg_text .js-header_from');
+    if (!el) {
+        return '';
+    }
+    var raw = (el.textContent || '').trim();
+    var lt = raw.indexOf('<');
+    if (lt > 0) {
+        raw = raw.slice(0, lt);
+    } else if (lt === 0 || raw.indexOf('@') > -1) {
+        return ''; /* a bare address is not a name */
+    }
+    return raw.replace(/^["'\s]+|["'\s]+$/g, '');
 };
 
 var dolibarr_context_body = function(root) {
     return root.querySelector('.dolibarr_context_body');
+};
+
+/* Move the panel onto the message's From row. */
+var dolibarr_context_relocate = function(root) {
+    var from = document.querySelector('.msg_text .js-header_from');
+    if (!from) {
+        return false;
+    }
+
+    var host = from.closest('.col-md-10');
+    if (!host) {
+        var dropdown = from.closest('.dropdown');
+        host = dropdown ? dropdown.parentNode : null;
+    }
+    if (!host) {
+        return false;
+    }
+
+    if (root.parentNode !== host) {
+        host.appendChild(root);
+    }
+    root.classList.add('dolibarr_context_inline');
+    root.classList.remove('border-bottom', 'border-secondary-subtle', 'py-2');
+
+    return true;
 };
 
 var dolibarr_context_note = function(root, text, cls) {
@@ -60,10 +94,7 @@ var dolibarr_context_note = function(root, text, cls) {
     body.appendChild(note);
 };
 
-/**
- * An anchor out to Dolibarr. Never built from a string, so a company name or a
- * document reference cannot close the attribute it sits in.
- */
+/* An anchor out to Dolibarr. */
 var dolibarr_context_link = function(text, url, cls) {
     var link = document.createElement('a');
     link.className = cls || 'text-decoration-none';
@@ -83,9 +114,7 @@ var dolibarr_context_badge = function(text, cls) {
     return badge;
 };
 
-/**
- * The rows behind one chip: reference, date, amount, each linking to its card.
- */
+/* The rows behind one chip: reference, date, amount, each linking to its card. */
 var dolibarr_context_rows = function(block, strings) {
     var wrap = document.createElement('div');
     wrap.className = 'dolibarr_context_rows ms-1 mt-1 border-start ps-2';
@@ -115,8 +144,7 @@ var dolibarr_context_rows = function(block, strings) {
         wrap.appendChild(line);
     });
 
-    /* Only when the block holds more than the rows we were given, so the link
-     * never promises a longer list than there is. */
+    /* Only when there are more than we were given, so the link is honest. */
     if (block.count > (block.rows || []).length && block.url) {
         var more = document.createElement('div');
         more.className = 'py-1';
@@ -127,9 +155,7 @@ var dolibarr_context_rows = function(block, strings) {
     return wrap;
 };
 
-/**
- * One chip: a count, a label, and a total when the records carry money.
- */
+/* One chip: a count, a label, and a total when the records carry money. */
 var dolibarr_context_chip = function(block) {
     var chip = document.createElement('button');
     chip.type = 'button';
@@ -162,52 +188,254 @@ var dolibarr_context_chip = function(block) {
     return chip;
 };
 
-/**
- * The identity line: third party, the person inside it, and what they are to
- * us. Falls back to the person alone for a colleague or a member, who have no
- * third party behind them.
- */
-var dolibarr_context_identity = function(data, strings) {
-    var line = document.createElement('div');
-    line.className = 'd-flex flex-wrap align-items-baseline gap-2';
+/* The identity link: the record's own name, carrying a mark that says it opens something. */
+var dolibarr_context_record_link = function(text, url, strings) {
+    var link = dolibarr_context_link(text, url, 'fw-semibold');
+    if (strings.open) {
+        link.setAttribute('title', strings.open);
+    }
 
+    var mark = document.createElement('i');
+    mark.className = 'bi bi-box-arrow-up-right ms-1 small';
+    mark.setAttribute('aria-hidden', 'true');
+    link.appendChild(mark);
+
+    return link;
+};
+
+/* Normalised for comparison only. */
+var dolibarr_context_same_name = function(a, b) {
+    var norm = function(v) {
+        return (v || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    };
+    return norm(a) !== '' && norm(a) === norm(b);
+};
+
+/* What to call the record, given that the From line above it already names the sender. */
+var dolibarr_context_label = function(data, strings) {
     var match = data.match;
     var party = data.thirdparty;
+    var sender = dolibarr_context_sender_name();
+
+    if (party && party.name && !dolibarr_context_same_name(party.name, sender)) {
+        return { text: party.name, url: party.url, showBadges: true };
+    }
 
     if (party) {
-        line.appendChild(dolibarr_context_link(party.name, party.url, 'text-decoration-none fw-semibold'));
-
-        if (match && match.type !== 'thirdparty' && match.name) {
-            var person = document.createElement('span');
-            person.textContent = match.name + (match.job ? ' · ' + match.job : '');
-            line.appendChild(person);
-        }
-
+        /* The company is the sender. */
         if (party.is_customer) {
-            line.appendChild(dolibarr_context_badge(strings.customer, 'bg-primary-subtle text-primary-emphasis'));
+            return { text: strings.customer, url: party.url, showBadges: false };
         }
         if (party.is_supplier) {
-            line.appendChild(dolibarr_context_badge(strings.supplier, 'bg-info-subtle text-info-emphasis'));
+            return { text: strings.supplier, url: party.url, showBadges: false };
         }
-    } else if (match) {
-        line.appendChild(dolibarr_context_link(match.name || match.type_label, match.url, 'text-decoration-none fw-semibold'));
-        line.appendChild(dolibarr_context_badge(match.type_label));
-        if (match.job) {
-            var job = document.createElement('span');
-            job.textContent = match.job;
-            line.appendChild(job);
-        }
+        return { text: party.name, url: party.url, showBadges: false };
     }
 
-    /* Right hand end, so the way out of the panel is always in the same place
-     * whatever the identity line happens to contain. */
-    var target = party || match;
-    if (target && target.url) {
-        var out = dolibarr_context_link(strings.open, target.url, 'text-decoration-none ms-auto');
-        line.appendChild(out);
+    /* A colleague or member: no company, so the record type is all that is new. */
+    return {
+        text: (match.type_label || match.name),
+        url: match.url,
+        showBadges: false
+    };
+};
+
+/* The offer, for an address that matched nothing: one quiet button. */
+var dolibarr_context_offer_add = function(root, strings) {
+    var body = dolibarr_context_body(root);
+    if (!body) {
+        return;
+    }
+    body.innerHTML = '';
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 py-0 px-2';
+    btn.id = 'dolibarr_context_add';
+    /* Plain title attribute: this control is rebuilt per message, and an
+     * uninitialised Bootstrap tooltip would show nothing. */
+    if (strings.addWhy) {
+        btn.setAttribute('title', strings.addWhy);
     }
 
-    return line;
+    var icon = document.createElement('i');
+    icon.className = 'bi bi-person-plus';
+    btn.appendChild(icon);
+
+    var label = document.createElement('span');
+    label.textContent = strings.add;
+    btn.appendChild(label);
+
+    btn.addEventListener('click', function() {
+        dolibarr_context_open_add(root, strings);
+    });
+
+    body.appendChild(btn);
+};
+
+/* The create dialog. */
+var dolibarr_context_open_add = function(root, strings) {
+    var email = root.getAttribute('data-email');
+    var suggested = dolibarr_context_sender_name() || email.split('@')[0];
+
+    var modal = new Hm_Modal({
+        title: strings.addTitle,
+        modalId: 'dolibarr_context_add_modal'
+    });
+
+    /* Static shell; values from the message are written in below. */
+    modal.setContent(
+        '<div class="mb-2">' +
+        '<label class="form-label small fw-medium" for="dolibarr_context_add_name"></label>' +
+        '<input type="text" class="form-control form-control-sm" id="dolibarr_context_add_name" autocomplete="off">' +
+        '</div>' +
+        '<div class="small text-muted" id="dolibarr_context_add_email"></div>' +
+        '<div class="small text-muted mt-2" id="dolibarr_context_add_hint"></div>' +
+        '<div class="small text-danger mt-2" id="dolibarr_context_add_error" hidden></div>'
+    );
+
+    /* The extra class is how the click handler finds this button again. */
+    modal.addFooterBtn(strings.addSave, 'btn-primary dolibarr_context_create_btn', function() {
+        var field = document.getElementById('dolibarr_context_add_name');
+        dolibarr_context_do_create(root, strings, modal, field ? field.value : '');
+    });
+
+    modal.open();
+
+    var lbl = document.querySelector('label[for="dolibarr_context_add_name"]');
+    if (lbl) {
+        lbl.textContent = strings.addName;
+    }
+    var field = document.getElementById('dolibarr_context_add_name');
+    if (field) {
+        field.value = suggested;
+        field.focus();
+        field.select();
+    }
+    var mail = document.getElementById('dolibarr_context_add_email');
+    if (mail) {
+        mail.textContent = email;
+    }
+    var hint = document.getElementById('dolibarr_context_add_hint');
+    if (hint) {
+        hint.textContent = strings.addHint;
+    }
+};
+
+/* Put the dialog's create button into a working state, or take it away. */
+var dolibarr_context_create_btn_state = function(modal, working, strings) {
+    var btn = document.querySelector('.dolibarr_context_create_btn');
+
+    if (!working) {
+        modal.customButtons = [];
+        modal.recreateButtons();
+        return;
+    }
+
+    if (!btn) {
+        return;
+    }
+
+    /* Disabled first: the endpoint is idempotent, but two requests are not. */
+    btn.disabled = true;
+    btn.textContent = '';
+
+    var spin = document.createElement('span');
+    spin.className = 'spinner-border spinner-border-sm me-1';
+    spin.setAttribute('role', 'status');
+    spin.setAttribute('aria-hidden', 'true');
+    btn.appendChild(spin);
+
+    var label = document.createElement('span');
+    label.textContent = strings.addWorking;
+    btn.appendChild(label);
+};
+
+/* What the dialog says once the record exists: that it does, and a way to go and look at it. */
+var dolibarr_context_create_done = function(modal, strings, status, url, name) {
+    modal.setContent(
+        '<div class="d-flex align-items-start gap-2">' +
+        '<i class="bi bi-check-circle-fill text-success fs-5"></i>' +
+        '<div>' +
+        '<div class="fw-medium" id="dolibarr_context_done_title"></div>' +
+        '<div class="small text-muted" id="dolibarr_context_done_name"></div>' +
+        '<div class="mt-2" id="dolibarr_context_done_link"></div>' +
+        '</div></div>'
+    );
+
+    var title = document.getElementById('dolibarr_context_done_title');
+    if (title) {
+        title.textContent = (status === 'created') ? strings.addDone : strings.addExisting;
+    }
+
+    var who = document.getElementById('dolibarr_context_done_name');
+    if (who) {
+        who.textContent = name || '';
+    }
+
+    var slot = document.getElementById('dolibarr_context_done_link');
+    if (slot && url) {
+        slot.appendChild(dolibarr_context_record_link(strings.addOpen, url, strings));
+    }
+
+    /* Nothing left to create, so the button that offered it goes. */
+    dolibarr_context_create_btn_state(modal, false, strings);
+};
+
+/* POST the create, then tell the dialog and redraw the panel behind it. */
+var dolibarr_context_do_create = function(root, strings, modal, name) {
+    var email = root.getAttribute('data-email');
+    var err = document.getElementById('dolibarr_context_add_error');
+    if (err) {
+        err.hidden = true;
+        err.textContent = '';
+    }
+
+    dolibarr_context_create_btn_state(modal, true, strings);
+    dolibarr_context_note(root, strings.addWorking);
+
+    Hm_Ajax.request(
+        [{'name': 'hm_ajax_hook', 'value': 'ajax_dolibarr_context_create'},
+        {'name': 'dolibarr_context_email', 'value': email},
+        {'name': 'dolibarr_context_name', 'value': name}],
+        function(res) {
+            var status = (res && res.dolibarr_context_create_status) || 'error';
+
+            if (status !== 'created' && status !== 'existing') {
+                /* Kept in the dialog: the refusal belongs beside the field. */
+                var message = (res && res.dolibarr_context_create_message) || strings.addFailed;
+                var box = document.getElementById('dolibarr_context_add_error');
+                if (box) {
+                    box.textContent = message;
+                    box.hidden = false;
+                }
+                var btn = document.querySelector('.dolibarr_context_create_btn');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = strings.addSave;
+                }
+                dolibarr_context_offer_add(root, strings);
+                return;
+            }
+
+            dolibarr_context_create_done(
+                modal,
+                strings,
+                status,
+                (res && res.dolibarr_context_create_url) || '',
+                (res && res.dolibarr_context_create_name) || name
+            );
+
+            /* The panel behind still says nobody owns this address. */
+            dolibarr_context_state = { email: null, data: null, status: '', at: 0 };
+            root.removeAttribute('data-dolibarr-bound');
+            dolibarr_context_init();
+        },
+        [],
+        true,
+        undefined,
+        true
+    );
 };
 
 var dolibarr_context_render = function(root, strings, data, status) {
@@ -217,23 +445,52 @@ var dolibarr_context_render = function(root, strings, data, status) {
     }
 
     if (!data || !data.match) {
-        /* Deliberately not hidden. "This sender is nobody we have a record of"
-         * is worth a line, and a panel that appears only sometimes is harder
-         * to read than one that is always there. */
-        dolibarr_context_note(root, strings.unknown, 'text-muted fst-italic');
+        /* One quiet control rather than a sentence. */
+        if (data && data.can_create) {
+            dolibarr_context_offer_add(root, strings);
+        } else {
+            root.hidden = true;
+        }
         return;
     }
 
     body.innerHTML = '';
-    body.appendChild(dolibarr_context_identity(data, strings));
+
+    /* Only when the panel could not be moved onto the From row. */
+    if (!root.classList.contains('dolibarr_context_inline') && strings.caption) {
+        var caption = document.createElement('div');
+        caption.className = 'dolibarr_context_caption text-muted w-100';
+        caption.textContent = strings.caption;
+        body.appendChild(caption);
+    }
+
+    var label = dolibarr_context_label(data, strings);
+    body.appendChild(dolibarr_context_record_link(label.text, label.url, strings));
+
+    if (label.showBadges) {
+        var party = data.thirdparty;
+        if (party && party.is_customer) {
+            body.appendChild(dolibarr_context_badge(strings.customer, 'bg-primary-subtle text-primary-emphasis'));
+        }
+        if (party && party.is_supplier) {
+            body.appendChild(dolibarr_context_badge(strings.supplier, 'bg-info-subtle text-info-emphasis'));
+        }
+    }
 
     var blocks = data.blocks || [];
+    if (!blocks.length) {
+        var none = document.createElement('span');
+        none.className = 'text-muted';
+        none.textContent = strings.empty;
+        body.appendChild(none);
+    }
     if (blocks.length) {
-        var chips = document.createElement('div');
-        chips.className = 'd-flex flex-wrap gap-2 mt-2';
+        var chips = document.createElement('span');
+        chips.className = 'd-inline-flex flex-wrap gap-2';
 
+        /* Full width, so rows drop below instead of widening the header row. */
         var rows = document.createElement('div');
-        rows.className = 'mt-1';
+        rows.className = 'w-100 mt-1';
 
         blocks.forEach(function(block) {
             chips.appendChild(dolibarr_context_chip(block));
@@ -254,8 +511,7 @@ var dolibarr_context_render = function(root, strings, data, status) {
                 return;
             }
             var opening = panel.hidden;
-            /* One open at a time: the panel sits above the message and should
-             * not grow to push the body off the screen. */
+            /* One open at a time: this sits above the message. */
             rows.querySelectorAll('[data-rows-for]').forEach(function(other) {
                 other.hidden = true;
             });
@@ -271,18 +527,60 @@ var dolibarr_context_render = function(root, strings, data, status) {
 
     if (status === 'stale') {
         var warn = document.createElement('div');
-        warn.className = 'small text-warning-emphasis mt-1';
+        warn.className = 'small text-warning-emphasis w-100';
         warn.textContent = strings.stale;
         body.appendChild(warn);
     }
 };
 
-var dolibarr_context_load = function(root, strings) {
+/* Give up, but leave a way back. */
+var dolibarr_context_recover = function(root, strings, attempt) {
+    if (!document.body.contains(root)) {
+        return; /* the message was closed while we were waiting */
+    }
+
+    if (attempt < 2) {
+        dolibarr_context_load(root, strings, attempt + 1);
+        return;
+    }
+
+    var body = dolibarr_context_body(root);
+    if (!body) {
+        return;
+    }
+    body.innerHTML = '';
+
+    /* A control, not a message. */
+    var again = document.createElement('button');
+    again.type = 'button';
+    again.className = 'btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1 py-0 px-2';
+    again.id = 'dolibarr_context_recheck';
+    if (strings.failed) {
+        again.setAttribute('title', strings.failed);
+    }
+
+    var icon = document.createElement('i');
+    icon.className = 'bi bi-arrow-clockwise';
+    again.appendChild(icon);
+
+    var label = document.createElement('span');
+    label.textContent = strings.retry;
+    again.appendChild(label);
+
+    again.addEventListener('click', function() {
+        /* Back to attempt one, so the button gets the silent retry too. */
+        dolibarr_context_load(root, strings, 1);
+    });
+
+    body.appendChild(again);
+};
+
+/* Fetch the card for this panel's address and draw it. */
+var dolibarr_context_load = function(root, strings, attempt) {
+    attempt = attempt || 1;
     var email = root.getAttribute('data-email');
 
-    /* Short, and deliberately shorter than the session cache behind it: this
-     * one exists to absorb the double render of a single message, not to hold
-     * a card across the minutes a user spends reading one. */
+    /* Shorter than the session cache: this absorbs the double render only. */
     if (dolibarr_context_state.email === email
             && dolibarr_context_state.data
             && (Date.now() - dolibarr_context_state.at) < 15000) {
@@ -292,29 +590,54 @@ var dolibarr_context_load = function(root, strings) {
 
     dolibarr_context_note(root, strings.loading);
 
+    var settled = false;
+    var timer = window.setTimeout(function() {
+        if (settled) {
+            return;
+        }
+        settled = true;
+        dolibarr_context_recover(root, strings, attempt);
+    }, 8000);
+
+    /* Whichever of the two paths arrives first wins; the other becomes a no-op. */
+    var claim = function() {
+        if (settled) {
+            return false;
+        }
+        settled = true;
+        window.clearTimeout(timer);
+        return true;
+    };
+
     Hm_Ajax.request(
         [{'name': 'hm_ajax_hook', 'value': 'ajax_dolibarr_context'},
         {'name': 'dolibarr_context_email', 'value': email}],
         function(res) {
-            /* The message may have been closed, or another one opened, while
-             * the request was in flight. Redrawing the shell we were given
-             * rather than whatever is on screen now keeps the card and the
-             * message it belongs to together. */
+            if (!claim()) {
+                return;
+            }
+
+            /* The message may have been closed, or another one opened, while the request was in flight. */
             if (!document.body.contains(root)) {
+                return;
+            }
+
+            /* on_failure hands us false rather than a response. */
+            if (!res) {
+                dolibarr_context_recover(root, strings, attempt);
                 return;
             }
 
             var status = res.dolibarr_context_status || 'error';
 
-            if (status === 'unconfigured') {
-                /* Nothing was wired up. A build problem is not something to
-                 * explain on top of somebody's mail; the debug log has it. */
+            if (status === 'unconfigured' || status === 'forbidden') {
+                /* 'unconfigured' is a build problem, which is not something to explain on top of somebody's mail. */
                 root.hidden = true;
                 return;
             }
 
             if (!res.dolibarr_context_data) {
-                dolibarr_context_note(root, strings.failed, 'text-danger');
+                dolibarr_context_recover(root, strings, attempt);
                 return;
             }
 
@@ -322,7 +645,7 @@ var dolibarr_context_load = function(root, strings) {
             try {
                 data = JSON.parse(res.dolibarr_context_data);
             } catch (err) {
-                dolibarr_context_note(root, strings.failed, 'text-danger');
+                dolibarr_context_recover(root, strings, attempt);
                 return;
             }
 
@@ -333,8 +656,23 @@ var dolibarr_context_load = function(root, strings) {
                 at: Date.now()
             };
 
-            dolibarr_context_render(root, strings, data, status);
-        }
+            /* A throw here would leave the loading note as the last thing written. */
+            try {
+                dolibarr_context_render(root, strings, data, status);
+            } catch (err) {
+                if (window.console && console.error) {
+                    console.error('dolibarr_context: render failed', err);
+                }
+                dolibarr_context_recover(root, strings, 2);
+            }
+        },
+        [],
+        /* no_icon: no need to spin the application's loading indicator. */
+        true,
+        /* batch_callback: left undefined on purpose. */
+        undefined,
+        /* on_failure is a flag, not a handler: the callback gets false. */
+        true
     );
 };
 
@@ -344,18 +682,19 @@ var dolibarr_context_init = function() {
         return; /* not a message view, or no address to look up */
     }
 
-    /* The message response is replayed from local storage before the server
-     * copy lands, so this runs twice for one message. */
+    /* The response is replayed from local storage, so this runs twice. */
     if (root.getAttribute('data-dolibarr-bound') === '1') {
         return;
     }
     root.setAttribute('data-dolibarr-bound', '1');
 
+    /* Before the fetch, so the loading note appears in its final place. */
+    dolibarr_context_relocate(root);
+
     dolibarr_context_load(root, dolibarr_context_strings(root));
 };
 
-/* imap/site.js calls this once the headers, body and parts are all in the DOM,
- * which is the first moment the shell exists to be found. */
+/* imap/site.js calls this once the message view is fully in the DOM. */
 var dolibarr_context_view_finished = window.imap_message_view_finished;
 window.imap_message_view_finished = function(msg_uid, detail, listParent, skip_links) {
     var result = dolibarr_context_view_finished
