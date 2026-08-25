@@ -22,11 +22,6 @@ require_once __DIR__ . '/../install/paths.class.php';
  * \ingroup     cyphtWebmail
  * \brief       Installs the "dolibarr_context" Cypht module set, which puts a
  *              panel under the headers of an open message saying who the
- *              sender is in Dolibarr and what is still open against them.
- *
- *              Source lives in cypht/modules/dolibarr_context and is copied
- *              into vendor/jason-munro/cypht on every build, so a "composer
- *              update" cannot silently revert it.
  */
 class CyphtContextSource
 {
@@ -47,7 +42,6 @@ class CyphtContextSource
 
 	/**
 	 * Module set name. Must also appear in CyphtEnvironment's CYPHT_MODULES
-	 * list, or config_gen.php never scans it.
 	 */
 	const MODULE_NAME = 'dolibarr_context';
 
@@ -63,7 +57,6 @@ class CyphtContextSource
 
 	/**
 	 * Absolute URL of the context feed the module set calls.
-	 *
 	 * @return string
 	 */
 	public function getBridgeUrl()
@@ -73,18 +66,31 @@ class CyphtContextSource
 
 	/**
 	 * Static form, so CyphtEnvironment can build the .env line without an
-	 * instance and without a $db handle it has no other use for.
-	 *
 	 * @return string
 	 */
 	public static function resolveBridgeUrl()
 	{
+		// Escape hatch when Dolibarr cannot reach itself on its public URL.
 		$url = getDolGlobalString('CYPHTWEBMAIL_BRIDGE_CONTEXT_URL', '');
 		if ($url !== '') {
 			return $url;
 		}
 
 		return dol_buildpath('/cyphtwebmail/bridge/context.php', 2);
+	}
+
+	/**
+	 * Absolute URL of the endpoint that creates a prospect from a sender.
+	 * @return string
+	 */
+	public static function resolveCreateUrl()
+	{
+		$url = getDolGlobalString('CYPHTWEBMAIL_BRIDGE_CONTEXT_CREATE_URL', '');
+		if ($url !== '') {
+			return $url;
+		}
+
+		return dol_buildpath('/cyphtwebmail/bridge/create.php', 2);
 	}
 
 }
