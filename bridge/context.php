@@ -19,12 +19,6 @@
  * \file        bridge/context.php
  * \brief       Who one email address is in Dolibarr, and what is open against
  *              them, for the message view in Cypht.
- *
- *              Read only. Every block is gated twice, on isModEnabled() and on
- *              the bridge user's own read right, so an install without tickets
- *              or a user without invoice rights simply gets fewer blocks
- *              rather than an error. Same pattern as the member block in
- *              bridge/contacts.php.
  */
 
 // This is a machine-to-machine JSON endpoint: no session, no menus, no CSRF.
@@ -73,7 +67,6 @@ if (!$res) {
 
 /**
  * Emit a JSON response and stop.
- *
  * @param int   $status HTTP status code
  * @param array $body   Payload to encode
  * @return void
@@ -101,9 +94,6 @@ if (!isModEnabled('cyphtwebmail')) {
 	cyphtContextRespond(403, array('error' => 'Module not enabled'));
 }
 
-// 'aZ09arobase' (a-z0-9_-.@) covers every character a Dolibarr login may
-// contain. The address gets the looser 'nohtml' filter because a real mailbox
-// may hold '+' or an apostrophe, and is then validated as an address outright.
 $login = GETPOST('login', 'aZ09arobase');
 $token = GETPOST('token', 'aZ09');
 $email = trim(GETPOST('email', 'nohtml'));
@@ -118,10 +108,6 @@ if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
 
 // --- 1. Token ---------------------------------------------------------
 
-// Read the constant directly rather than going through dolibarr_get_const():
-// not llx_const, because dolibarr_set_const() encrypts anything whose name
-// ends in _SECRET, and the webmail reads its copy over raw PDO before Dolibarr
-// is loaded, so the two ends would sign with different values.
 require_once __DIR__.'/../class/install/config.class.php';
 $secret = CyphtConfig::get($db, 'SSO_SHARED_SECRET', '');
 if ($secret === '') {
@@ -142,8 +128,7 @@ if (abs(time() - (int) $timestamp) > 60) {
 	cyphtContextRespond(403, array('error' => 'Token expired'));
 }
 
-// The '|context' tag is what stops a contacts or templates token being
-// replayed against this endpoint.
+// Purpose tag stops a token for another endpoint being replayed here.
 $expected = hash_hmac('sha256', $login.'|'.$timestamp.'|context', $secret);
 if (!hash_equals($expected, $signature)) {
 	cyphtContextRespond(403, array('error' => 'Bad signature'));
@@ -160,21 +145,25 @@ if (isset($bridgeUser->statut) && $bridgeUser->statut == 0) {
 }
 $bridgeUser->loadRights();
 
-// NOLOGIN leaves $conf->entity at its default; realign it with the user so
-// getEntity() below filters correctly under Multicompany.
+// NOLOGIN leaves $conf->entity at its default; realign it with the user.
 $conf->entity = ($bridgeUser->entity > 0 ? $bridgeUser->entity : 1);
+
+// Module permission, then Dolibarr's own right. Both must pass.
+if (!$bridgeUser->hasRight('cyphtwebmail', 'context', 'read')) {
+	cyphtContextRespond(403, array('error' => 'User is not allowed sender records in the webmail'));
+}
 
 if (!$bridgeUser->hasRight('societe', 'lire')) {
 	cyphtContextRespond(403, array('error' => 'User cannot read third parties'));
 }
 
+$canCreate = $bridgeUser->hasRight('cyphtwebmail', 'context', 'create')
+	&& $bridgeUser->hasRight('societe', 'creer');
+
 // --- 3. Helpers -------------------------------------------------------
 
 /**
  * Absolute URL of a Dolibarr page. Absolute, not root relative, because the
- * webmail is served from its own path inside an iframe and a relative link
- * would resolve against that.
- *
  * @param string $path  Path below htdocs, leading slash included
  * @param string $query Query string without the leading '?'
  * @return string
@@ -190,11 +179,6 @@ function cyphtContextUrl($path, $query = '')
 
 /**
  * Money, formatted the way Dolibarr formats it everywhere else.
- *
- * price() returns display HTML, which would arrive in the panel as a literal
- * '&nbsp;' because every value there is written with textContent. Decoding
- * here keeps Dolibarr's locale rules and gives the panel plain text.
- *
  * @param float $amount Amount
  * @return string
  */
@@ -209,7 +193,6 @@ function cyphtContextPrice($amount)
 
 /**
  * A date, or an empty string when the column was null.
- *
  * @param string $sqlDate Raw column value
  * @return string
  */
@@ -221,19 +204,12 @@ function cyphtContextDate($sqlDate)
 		return '';
 	}
 
-	// 'tzserver', not 'tzuser': NOLOGIN means there is no session to read a
-	// user timezone from, and every column shown here is a document date
-	// rather than a moment, so the server's own reading is the correct one.
+	// 'tzserver': NOLOGIN has no session to read a user timezone from.
 	return html_entity_decode(dol_print_date($db->jdate($sqlDate), 'day', 'tzserver', $langs), ENT_QUOTES | ENT_HTML5, 'UTF-8');
 }
 
 /**
  * Run one block: a headline count and total, plus the few most recent rows.
- *
- * Two queries rather than one, because the count has to cover everything open
- * while the rows are capped. A block whose count is zero is dropped by the
- * caller, so an empty block never reaches the panel.
- *
  * @param array $spec Block definition, see the calls below
  * @return array|null Block payload, or null when nothing matched
  */
@@ -241,9 +217,7 @@ function cyphtContextBlock($spec)
 {
 	global $db;
 
-	// getEntity() is given each table's own element name rather than a shared
-	// one: under Multicompany a group may share third parties without sharing
-	// invoices, and 'societe' for all of them would leak across that line.
+	// Each table's own element name, not a shared one: entities may differ.
 	$where = $spec['where']." AND t.entity IN (".getEntity($spec['element']).")";
 
 	$sql = "SELECT COUNT(t.rowid) as nb";
@@ -308,18 +282,14 @@ function cyphtContextBlock($spec)
 
 // --- 4. Who is this address? ------------------------------------------
 
-// Block headings are the words Dolibarr itself uses for these records, so a
-// user reading the panel and a user reading Dolibarr see the same label. That
-// means loading the same lang files those pages load.
+// Block headings use Dolibarr's own words for these records.
 $langs->loadLangs(array('companies', 'commercial', 'bills', 'orders', 'propal', 'projects', 'ticket', 'members'));
 
 $escaped = "'".$db->escape($email)."'";
 $match = null;
 $socid = 0;
 
-// Contact first, then third party, then colleague, then member: the same
-// precedence bridge/contacts.php uses when it de-duplicates on address, so a
-// name that appears in both places resolves to the person, not the company.
+// Same precedence bridge/contacts.php uses when de-duplicating on address.
 $sql = "SELECT sp.rowid, sp.lastname, sp.firstname, sp.poste, sp.phone, sp.phone_mobile, sp.fk_soc";
 $sql .= " FROM ".MAIN_DB_PREFIX."socpeople as sp";
 $sql .= " WHERE sp.entity IN (".getEntity('contact').")";
@@ -356,8 +326,7 @@ if ($match === null) {
 	$resql = $db->query($sql);
 	if ($resql && ($obj = $db->fetch_object($resql))) {
 		$socid = (int) $obj->rowid;
-		// Filled in from the third party block below, which reads the same row
-		// in full; setting only the type here avoids querying it twice.
+		// Name filled in from the third party block below.
 		$match = array(
 			'type' => 'thirdparty',
 			'type_label' => $langs->trans('ThirdParty'),
@@ -426,14 +395,14 @@ if ($match === null && isModEnabled('member') && $bridgeUser->hasRight('adherent
 	}
 }
 
-// An address nobody in Dolibarr owns. Answered with a body rather than a 404,
-// because "not a customer" is a useful thing for the panel to be able to say.
+// Nobody owns this address. A body, not a 404: the panel still uses it.
 if ($match === null) {
 	cyphtContextRespond(200, array(
 		'email' => $email,
 		'match' => null,
 		'thirdparty' => null,
 		'blocks' => array(),
+		'can_create' => $canCreate,
 		'entity' => (int) $conf->entity,
 	));
 }
@@ -468,8 +437,7 @@ if ($socid > 0) {
 			$match['phone'] = $thirdparty['phone'];
 		}
 	} else {
-		// The contact points at a third party this entity cannot see. Drop the
-		// link rather than reporting a company we are not allowed to name.
+		// Third party not visible in this entity. Drop the link.
 		$socid = 0;
 	}
 	if ($resql) {
@@ -491,8 +459,7 @@ if ($rowLimit > 10) {
 if ($socid > 0) {
 	$socClause = "t.fk_soc = ".((int) $socid);
 
-	// Module key and permission name differ throughout Dolibarr; both pairs
-	// below are copied from core/ajax/selectsearchbox.php rather than guessed.
+	// Module keys and permission names differ; pairs from selectsearchbox.php.
 	if (isModEnabled('propal') && $bridgeUser->hasRight('propal', 'lire')) {
 		$block = cyphtContextBlock(array(
 			'key' => 'propal',
@@ -500,8 +467,7 @@ if ($socid > 0) {
 			'label' => $langs->trans('Proposals'),
 			'icon' => 'bi-file-earmark-text',
 			'table' => 'propal',
-			// 1 = validated and still open. Drafts are nobody's business yet
-			// and closed ones are not context, they are history.
+			// 1 = validated and still open.
 			'where' => $socClause." AND t.fk_statut = 1",
 			'ref' => 'ref',
 			'date' => 'datep',
@@ -539,16 +505,12 @@ if ($socid > 0) {
 	if (isModEnabled('invoice') && $bridgeUser->hasRight('facture', 'lire')) {
 		$block = cyphtContextBlock(array(
 			'key' => 'invoice',
-			// 'invoice', not 'facture': the element name getEntity() expects
-			// is not the table name here. Facture::liste_array() and
-			// facture.class.php:5233 both use this one.
+			// 'invoice', not the table name: what getEntity() expects here.
 			'element' => 'invoice',
 			'label' => $langs->trans('BillsCustomersUnpaid'),
 			'icon' => 'bi-receipt',
 			'table' => 'facture',
-			// Validated and not settled. 'paye' is deprecated in favour of
-			// statut = 2, but every version this module supports still writes
-			// it, and statut = 1 with paye = 0 is unambiguous in all of them.
+			// Validated and not settled.
 			'where' => $socClause." AND t.fk_statut = 1 AND t.paye = 0",
 			'ref' => 'ref',
 			'date' => 'datef',
@@ -569,8 +531,7 @@ if ($socid > 0) {
 			'label' => $langs->trans('Tickets'),
 			'icon' => 'bi-life-preserver',
 			'table' => 'ticket',
-			// Ticket::STATUS_CLOSED is 8 and STATUS_CANCELED 9, so anything
-			// below 8 is still live. ticket.class.php:253-260.
+			// Below Ticket::STATUS_CLOSED (8).
 			'where' => $socClause." AND t.fk_statut < 8",
 			'ref' => 'ref',
 			'date' => 'datec',
@@ -611,5 +572,6 @@ cyphtContextRespond(200, array(
 	'match' => $match,
 	'thirdparty' => $thirdparty,
 	'blocks' => $blocks,
+	'can_create' => $canCreate,
 	'entity' => (int) $conf->entity,
 ));
