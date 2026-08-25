@@ -135,15 +135,14 @@ class CyphtEnvironment
 			'DOLIBARR_MAIL_TEMPLATES_TIMEOUT' => getDolGlobalString('CYPHTWEBMAIL_MAIL_TEMPLATES_TIMEOUT', '5'),
 			'DOLIBARR_MAIL_TEMPLATES_INSECURE' => getDolGlobalString('CYPHTWEBMAIL_MAIL_TEMPLATES_INSECURE', 'false'),
 			'DOLIBARR_CONTEXT_URL' => CyphtContextSource::resolveBridgeUrl(),
-			// Much shorter than the other two: an unpaid invoice being settled
-			// while a mailbox is open is exactly the change this panel exists
-			// to reflect, so a stale card is worse here than a second request.
+			// Shorter than the other two: this data changes while a mailbox is open.
 			'DOLIBARR_CONTEXT_TTL' => getDolGlobalString('CYPHTWEBMAIL_CONTEXT_TTL', '120'),
-			// Cards are cached per address. Without a ceiling, reading down a
-			// long folder would add one to the session file per message.
+			// Cards are cached per address; this caps how many.
 			'DOLIBARR_CONTEXT_CACHE' => getDolGlobalString('CYPHTWEBMAIL_CONTEXT_CACHE', '20'),
 			'DOLIBARR_CONTEXT_TIMEOUT' => getDolGlobalString('CYPHTWEBMAIL_CONTEXT_TIMEOUT', '5'),
 			'DOLIBARR_CONTEXT_INSECURE' => getDolGlobalString('CYPHTWEBMAIL_CONTEXT_INSECURE', 'false'),
+			// The write endpoint, keyed separately from the read one.
+			'DOLIBARR_CONTEXT_CREATE_URL' => CyphtContextSource::resolveCreateUrl(),
 			// Opened with target="_top" so it escapes the webmail iframe.
 			'DOLIBARR_NEW_CONTACT_URL' => dol_buildpath('/contact/card.php', 2) . '?action=create',
 		));
