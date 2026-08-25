@@ -346,6 +346,20 @@ class modcyphtWebmail extends DolibarrModules
 		*/
 		/* END MODULEBUILDER PERMISSIONS */
 
+		// Paired with societe->lire; both are required.
+		$this->rights[$r][0] = $this->numero . '01';
+		$this->rights[$r][1] = 'SeeSenderRecordsInWebmail';
+		$this->rights[$r][4] = 'context';
+		$this->rights[$r][5] = 'read';
+		$r++;
+
+		// Paired with societe->creer; both are required.
+		$this->rights[$r][0] = $this->numero . '02';
+		$this->rights[$r][1] = 'CreateProspectFromWebmail';
+		$this->rights[$r][4] = 'context';
+		$this->rights[$r][5] = 'create';
+		$r++;
+
 
 		// Main menu entries to add
 		$this->menu = array();
