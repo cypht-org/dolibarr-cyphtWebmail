@@ -112,10 +112,6 @@ class CyphtEnvironment
 			'DB_PASS'            => (isset($conf->db->pass) ? $conf->db->pass : ''),
 			// Configurable in conf.php, so never assumed to be llx_.
 			'DOLIBARR_DB_PREFIX' => (defined('MAIN_DB_PREFIX') ? MAIN_DB_PREFIX : 'llx_'),
-			'IMAP_AUTH_NAME'   => getDolGlobalString('CYPHTWEBMAIL_IMAP_NAME', 'Webmail'),
-			'IMAP_AUTH_SERVER' => getDolGlobalString('CYPHTWEBMAIL_IMAP_SERVER', 'localhost'),
-			'IMAP_AUTH_PORT'   => getDolGlobalString('CYPHTWEBMAIL_IMAP_PORT', '993'),
-			'IMAP_AUTH_TLS'    => getDolGlobalString('CYPHTWEBMAIL_IMAP_TLS', 'true'),
 			'USER_SETTINGS_DIR' => $dataDir . '/users',
 			'ATTACHMENT_DIR'   => $dataDir . '/attachments',
 			'SSO_SHARED_SECRET' => $this->token->getOrCreateSsoSecret(),
