@@ -456,11 +456,18 @@ if ($rowLimit > 10) {
 	$rowLimit = 10;
 }
 
+$blockSetting = getDolGlobalString('CYPHTWEBMAIL_CONTEXT_BLOCKS', 'propal,order,invoice,ticket,project');
+$enabledBlocks = ($blockSetting === 'none')
+	? array()
+	: array_filter(array_map('trim', explode(',', $blockSetting)));
+
+$invoiceScope = (getDolGlobalString('CYPHTWEBMAIL_CONTEXT_INVOICES', 'unpaid') === 'open') ? 'open' : 'unpaid';
+
 if ($socid > 0) {
 	$socClause = "t.fk_soc = ".((int) $socid);
 
 	// Module keys and permission names differ; pairs from selectsearchbox.php.
-	if (isModEnabled('propal') && $bridgeUser->hasRight('propal', 'lire')) {
+	if (in_array('propal', $enabledBlocks, true) && isModEnabled('propal') && $bridgeUser->hasRight('propal', 'lire')) {
 		$block = cyphtContextBlock(array(
 			'key' => 'propal',
 			'element' => 'propal',
@@ -481,7 +488,7 @@ if ($socid > 0) {
 		}
 	}
 
-	if (isModEnabled('order') && $bridgeUser->hasRight('commande', 'lire')) {
+	if (in_array('order', $enabledBlocks, true) && isModEnabled('order') && $bridgeUser->hasRight('commande', 'lire')) {
 		$block = cyphtContextBlock(array(
 			'key' => 'order',
 			'element' => 'commande',
@@ -502,16 +509,16 @@ if ($socid > 0) {
 		}
 	}
 
-	if (isModEnabled('invoice') && $bridgeUser->hasRight('facture', 'lire')) {
+	if (in_array('invoice', $enabledBlocks, true) && isModEnabled('invoice') && $bridgeUser->hasRight('facture', 'lire')) {
 		$block = cyphtContextBlock(array(
 			'key' => 'invoice',
 			// 'invoice', not the table name: what getEntity() expects here.
 			'element' => 'invoice',
-			'label' => $langs->trans('BillsCustomersUnpaid'),
+			'label' => $langs->trans($invoiceScope === 'open' ? 'BillsCustomers' : 'BillsCustomersUnpaid'),
 			'icon' => 'bi-receipt',
 			'table' => 'facture',
-			// Validated and not settled.
-			'where' => $socClause." AND t.fk_statut = 1 AND t.paye = 0",
+			// Validated, and unsettled unless the setup page asks for all of them.
+			'where' => $socClause." AND t.fk_statut = 1".($invoiceScope === 'open' ? '' : " AND t.paye = 0"),
 			'ref' => 'ref',
 			'date' => 'datef',
 			'amount' => 'total_ttc',
@@ -524,7 +531,7 @@ if ($socid > 0) {
 		}
 	}
 
-	if (isModEnabled('ticket') && $bridgeUser->hasRight('ticket', 'read')) {
+	if (in_array('ticket', $enabledBlocks, true) && isModEnabled('ticket') && $bridgeUser->hasRight('ticket', 'read')) {
 		$block = cyphtContextBlock(array(
 			'key' => 'ticket',
 			'element' => 'ticket',
@@ -545,7 +552,7 @@ if ($socid > 0) {
 		}
 	}
 
-	if (isModEnabled('project') && $bridgeUser->hasRight('projet', 'lire')) {
+	if (in_array('project', $enabledBlocks, true) && isModEnabled('project') && $bridgeUser->hasRight('projet', 'lire')) {
 		$block = cyphtContextBlock(array(
 			'key' => 'project',
 			'element' => 'project',

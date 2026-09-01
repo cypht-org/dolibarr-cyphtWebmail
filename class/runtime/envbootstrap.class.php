@@ -272,10 +272,6 @@ class CyphtEnvBootstrap
 		/* An allow list rather than a CYPHTWEBMAIL_% sweep: llx_const is
 		 * shared, so a suggestively named constant must not reach Cypht. */
 		$map = array(
-			'CYPHTWEBMAIL_IMAP_NAME' => 'IMAP_AUTH_NAME',
-			'CYPHTWEBMAIL_IMAP_SERVER' => 'IMAP_AUTH_SERVER',
-			'CYPHTWEBMAIL_IMAP_PORT' => 'IMAP_AUTH_PORT',
-			'CYPHTWEBMAIL_IMAP_TLS' => 'IMAP_AUTH_TLS',
 			'CYPHTWEBMAIL_SESSION_DEBUG' => 'SESSION_DEBUG',
 			'CYPHTWEBMAIL_SESSION_TTL' => 'SESSION_TTL',
 			'CYPHTWEBMAIL_SESSION_GC_DIVISOR' => 'SESSION_GC_DIVISOR',

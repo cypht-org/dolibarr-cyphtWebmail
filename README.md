@@ -118,8 +118,9 @@ and `USER_CONFIG_SECRET` are absent (presence means secrets leaked into the pack
 
 ### Configuration
 
-**CyphtWebmail → Module setup** shows IMAP defaults, build status, and the
-Generate button (dev mode only).
+**CyphtWebmail → Module setup** shows build status and the Generate button
+(dev mode only). Mailboxes are added by each user inside the webmail, under
+its own accounts page.
 
 ### Reactivate after descriptor changes
 
@@ -161,15 +162,10 @@ JOIN llx_user u ON u.rowid = c.fk_user;
 
 ## Configuration reference
 
-Set through the setup page, or in **Home → Setup → Other** for the ones without
-a form field.
+Set in **Home → Setup → Other**.
 
 | Constant | Default | Purpose |
 |---|---|---|
-| `CYPHTWEBMAIL_IMAP_NAME` | `Webmail` | default account label |
-| `CYPHTWEBMAIL_IMAP_SERVER` | `localhost` | default IMAP host |
-| `CYPHTWEBMAIL_IMAP_PORT` | `993` | default IMAP port |
-| `CYPHTWEBMAIL_IMAP_TLS` | `true` | default TLS |
 | `CYPHTWEBMAIL_SSO_SECRET` | generated | signs SSO and bridge tokens |
 | `CYPHTWEBMAIL_CONFIG_SECRET` | generated | encrypts stored mailbox passwords |
 | `CYPHTWEBMAIL_SESSION_TTL` | `604800` | session lifetime, seconds |
