@@ -19,6 +19,7 @@ require_once __DIR__ . '/../install/paths.class.php';
 require_once __DIR__ . '/../auth/token.class.php';
 require_once __DIR__ . '/../integration/contactsource.class.php';
 require_once __DIR__ . '/../integration/mailtemplatesource.class.php';
+require_once __DIR__ . '/../integration/contextsource.class.php';
 
 /**
  * \file        class/install/environment.class.php
@@ -67,17 +68,12 @@ class CyphtEnvironment
 			'DB_CONNECTION_TYPE' => 'host',
 			'SESSION_TYPE'     => 'custom',
 			'AUTH_TYPE'        => 'custom',
-			// Not 'file': Hm_User_Config_File keys its encryption on the login
-			// password, which under SSO is a fresh token every request.
 			'USER_CONFIG_TYPE' => 'custom:Custom_User_Config',
 			'ENABLE_REDIS'     => 'false',
 			'ENABLE_MEMCACHED' => 'false',
 			'ENABLE_DEBUG'     => 'false',
 			'DEFAULT_LANGUAGE' => 'en',
-			// Order matters: dolibarr_contacts must follow "contacts", whose
-			// load_contacts handler it attaches to. Omitting a module set here
-			// means config_gen.php never scans its setup.php.
-			'CYPHT_MODULES'    => 'core,contacts,dolibarr_contacts,dolibarr_mail_templates,imap,smtp,api_login,account,nux,developer,history,saved_searches,advanced_search,profiles,inline_message,imap_folders,keyboard_shortcuts,site,dynamic_login,sievefilters,themes',
+			'CYPHT_MODULES'    => 'core,contacts,dolibarr_contacts,dolibarr_mail_templates,imap,dolibarr_context,smtp,api_login,account,nux,developer,history,saved_searches,advanced_search,profiles,inline_message,imap_folders,keyboard_shortcuts,site,dolibarr_prefs,dynamic_login,sievefilters,themes',
 			'DISABLE_FINGERPRINT' => 'true',
 			'DISABLE_EMPTY_SUPERGLOBALS' => 'true',
 			'DISABLE_OPEN_BASE_DIR' => 'true',
@@ -86,8 +82,7 @@ class CyphtEnvironment
 
 	/**
 	 * buildTimeDefaults() plus everything that is per installation: database
-	 * credentials, generated secrets, data paths and bridge URLs. None of it
-	 * is knowable at compile time.
+	 * credentials, generated secrets, data paths and bridge URLs.
 	 *
 	 * @return array<string,string>
 	 */
@@ -97,7 +92,6 @@ class CyphtEnvironment
 
 		$dataDir = $this->paths->getDataDir();
 
-		// $conf->db is already decrypted, even when conf.php encrypts it.
 		$dbType = (isset($conf->db->type) && $conf->db->type === 'pgsql') ? 'pgsql' : 'mysql';
 
 		return array_merge(self::buildTimeDefaults(), array(
@@ -107,16 +101,10 @@ class CyphtEnvironment
 			'DB_NAME'            => (isset($conf->db->name) ? $conf->db->name : ''),
 			'DB_USER'            => (isset($conf->db->user) ? $conf->db->user : ''),
 			'DB_PASS'            => (isset($conf->db->pass) ? $conf->db->pass : ''),
-			// Configurable in conf.php, so never assumed to be llx_.
 			'DOLIBARR_DB_PREFIX' => (defined('MAIN_DB_PREFIX') ? MAIN_DB_PREFIX : 'llx_'),
-			'IMAP_AUTH_NAME'   => getDolGlobalString('CYPHTWEBMAIL_IMAP_NAME', 'Webmail'),
-			'IMAP_AUTH_SERVER' => getDolGlobalString('CYPHTWEBMAIL_IMAP_SERVER', 'localhost'),
-			'IMAP_AUTH_PORT'   => getDolGlobalString('CYPHTWEBMAIL_IMAP_PORT', '993'),
-			'IMAP_AUTH_TLS'    => getDolGlobalString('CYPHTWEBMAIL_IMAP_TLS', 'true'),
 			'USER_SETTINGS_DIR' => $dataDir . '/users',
 			'ATTACHMENT_DIR'   => $dataDir . '/attachments',
 			'SSO_SHARED_SECRET' => $this->token->getOrCreateSsoSecret(),
-			// Encrypts the mailbox passwords inside the stored config.
 			'USER_CONFIG_SECRET' => $this->token->getOrCreateConfigSecret(),
 			'SESSION_DEBUG'      => getDolGlobalString('CYPHTWEBMAIL_SESSION_DEBUG', 'false'),
 			'SESSION_TTL'        => getDolGlobalString('CYPHTWEBMAIL_SESSION_TTL', '604800'),
@@ -131,6 +119,15 @@ class CyphtEnvironment
 			'DOLIBARR_MAIL_TEMPLATES_TTL' => getDolGlobalString('CYPHTWEBMAIL_MAIL_TEMPLATES_TTL', '900'),
 			'DOLIBARR_MAIL_TEMPLATES_TIMEOUT' => getDolGlobalString('CYPHTWEBMAIL_MAIL_TEMPLATES_TIMEOUT', '5'),
 			'DOLIBARR_MAIL_TEMPLATES_INSECURE' => getDolGlobalString('CYPHTWEBMAIL_MAIL_TEMPLATES_INSECURE', 'false'),
+			'DOLIBARR_CONTEXT_URL' => CyphtContextSource::resolveBridgeUrl(),
+			// Shorter than the other two: this data changes while a mailbox is open.
+			'DOLIBARR_CONTEXT_TTL' => getDolGlobalString('CYPHTWEBMAIL_CONTEXT_TTL', '120'),
+			// Cards are cached per address; this caps how many.
+			'DOLIBARR_CONTEXT_CACHE' => getDolGlobalString('CYPHTWEBMAIL_CONTEXT_CACHE', '20'),
+			'DOLIBARR_CONTEXT_TIMEOUT' => getDolGlobalString('CYPHTWEBMAIL_CONTEXT_TIMEOUT', '5'),
+			'DOLIBARR_CONTEXT_INSECURE' => getDolGlobalString('CYPHTWEBMAIL_CONTEXT_INSECURE', 'false'),
+			// The write endpoint, keyed separately from the read one.
+			'DOLIBARR_CONTEXT_CREATE_URL' => CyphtContextSource::resolveCreateUrl(),
 			// Opened with target="_top" so it escapes the webmail iframe.
 			'DOLIBARR_NEW_CONTACT_URL' => dol_buildpath('/contact/card.php', 2) . '?action=create',
 		));
@@ -156,8 +153,7 @@ class CyphtEnvironment
 	}
 
 	/**
-	 * The same write, without needing an instance: an offline build has no
-	 * database handle to construct one with.
+	 * The same write, without needing an instance.
 	 *
 	 * @param string $cyphtPath Cypht root inside vendor/
 	 * @param array<string,string> $overrides Key/value pairs to force

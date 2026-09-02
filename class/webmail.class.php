@@ -254,9 +254,9 @@ class CyphtWebmail
 	 * @param string $cyphtUrl
 	 * @return bool
 	 */
-	public function performSsoLogin($login, $cyphtUrl)
+	public function performSsoLogin($login, $cyphtUrl, $userLang = '')
 	{
-		$result = $this->login->performSsoLogin($login, $cyphtUrl);
+		$result = $this->login->performSsoLogin($login, $cyphtUrl, $userLang);
 		$this->error = $this->login->error;
 		return $result;
 	}

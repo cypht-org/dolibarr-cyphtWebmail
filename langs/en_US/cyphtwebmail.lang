@@ -1,17 +1,14 @@
 ModulecyphtWebmailName = CyphtWebmail
 
-cyphtWebmailDescription = Cypht webmail integrated into Dolibarr
+cyphtWebmailDescription = Cypht webmail with your contacts, mail templates and sender records
 
 CyphtWebmailSetup = CyphtWebmail setup
 Settings = Settings
 CyphtWebmailSetupPage = CyphtWebmail setup page
 NewSection=New section
 
-CyphtWebmailImapName = IMAP server label
-CyphtWebmailImapServer = IMAP server hostname
-CyphtWebmailImapPort = IMAP server port
-CyphtWebmailImapTls = Use TLS
 
+CyphtWebmailBuildTab = Build
 CyphtWebmailBuildStatus = Cypht build status
 CyphtWebmailInstalledVersion = Cypht version installed (vendor/)
 CyphtWebmailBuiltVersion = Cypht version last built
@@ -62,3 +59,47 @@ CyphtWebmailMaintenanceHint = Developer tools. Releases ship already compiled, s
 
 CyphtWebmailModuleVersion = Module version
 CyphtWebmailVersionMismatch = built against %s, but %s is installed. Rebuild, or reinstall the release.
+
+#
+# Settings sections on the setup page. Every value here is read at runtime,
+# so saving takes effect on the next request without a rebuild.
+#
+CyphtWebmailSettingsHint = These apply straight away. Only changes under cypht/modules/ need a rebuild.
+CyphtWebmailValueOutOfRange = Some values were outside the allowed range and have been adjusted.
+
+CyphtWebmailAddressBookSettings = Address book
+CyphtWebmailContactsIncludeUsers = List staff accounts
+CyphtWebmailContactsMax = Maximum contacts loaded
+
+CyphtWebmailContextSettings = Sender records
+CyphtWebmailContextRows = Records listed per type
+
+CyphtWebmailContactsIncludeUsersHelp = Adds the people who have an account here to the webmail address book, so staff can find each other without every colleague having to exist as a contact.
+CyphtWebmailContactsMaxHelp = Upper bound on how many contacts the webmail loads at once. Raise it only if your address book is genuinely larger, because the whole list is fetched each time the cache expires.
+CyphtWebmailContextRowsHelp = How many records of each kind (proposals, orders, invoices, tickets, projects) are listed under the sender. Beyond this only the count is shown.
+
+CyphtWebmailContextBlocks = Record types shown
+CyphtWebmailContextBlocksHelp = Which kinds of record are listed under the sender. A kind whose module is off, or that the reader has no permission for, stays hidden whatever is ticked here.
+CyphtWebmailBlockPropal = Proposals
+CyphtWebmailBlockOrder = Orders
+CyphtWebmailBlockInvoice = Invoices
+CyphtWebmailBlockTicket = Tickets
+CyphtWebmailBlockProject = Projects
+CyphtWebmailContextInvoices = Invoices shown
+CyphtWebmailContextInvoicesHelp = Unpaid only answers "do they owe us money". All validated answers "what have we billed them". Chasing payment and checking history are different jobs.
+CyphtWebmailInvoicesUnpaid = Unpaid only
+CyphtWebmailInvoicesOpen = All validated
+
+CyphtWebmailInterfaceSettings = Interface
+CyphtWebmailLangMode = Language
+CyphtWebmailLangModeHelp = The first applies each user's own account language to the webmail when they sign in. The second leaves the webmail's own language setting alone. A language the webmail has no translation for falls back to the default.
+CyphtWebmailLangFollow = Same as their account
+CyphtWebmailLangUser = Chosen in the webmail
+
+CyphtWebmailThemeMode = Light or dark
+CyphtWebmailThemeModeHelp = The webmail is embedded in the page around it, so a light webmail inside a dark page looks broken. Matching follows the same dark mode setting the surrounding page uses, and applies it on each sign-in, which means a theme picked inside the webmail will not stick.
+CyphtWebmailThemeFollow = Match the page around it
+CyphtWebmailThemeUser = Chosen in the webmail
+
+SeeSenderRecordsInWebmail = See the sender's records in the webmail
+CreateProspectFromWebmail = Create a prospect from a message sender
