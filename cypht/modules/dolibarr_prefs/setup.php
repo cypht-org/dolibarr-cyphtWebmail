@@ -2,10 +2,17 @@
 
 if (!defined('DEBUG_MODE')) { die(); }
 
-/* functional_api is the page cypht_login() runs. Its handlers are plain
- * functions, called after the user config is loaded and before it is dumped
- * into the session, which is the only moment a preference can be applied
- * without the user having to save anything. */
 add_handler('functional_api', 'dolibarr_apply_language', true, 'dolibarr_prefs');
+add_handler('functional_api', 'dolibarr_apply_theme', true, 'dolibarr_prefs');
 
-return array();
+handler_source('dolibarr_prefs');
+output_source('dolibarr_prefs');
+
+add_module_to_all_pages('handler', 'dolibarr_theme_auto', true, 'dolibarr_prefs', 'load_theme', 'after');
+add_module_to_all_pages('output', 'dolibarr_theme_auto', true, 'dolibarr_prefs', 'theme_css', 'after');
+
+return array(
+    'allowed_output' => array(
+        'dolibarr_theme_auto' => array(FILTER_VALIDATE_BOOLEAN, false),
+    ),
+);
