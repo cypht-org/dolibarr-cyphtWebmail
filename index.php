@@ -85,7 +85,7 @@ $ssoOk = false;
 $publicUrl = '';
 if ($manager->isPublished()) {
 	$publicUrl = dol_buildpath('/cyphtwebmail/public/index.php', 1);
-	$ssoOk = $manager->performSsoLogin($user->login, $publicUrl);
+	$ssoOk = $manager->performSsoLogin($user->login, $publicUrl, $langs->defaultlang);
 }
 
 llxHeader('', $langs->trans("CyphtWebmailArea"), '', '', 0, 0, '', '', '', 'mod-cyphtwebmail page-index');

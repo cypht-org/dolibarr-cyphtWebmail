@@ -17,6 +17,7 @@
 
 require_once __DIR__ . '/../install/paths.class.php';
 require_once __DIR__ . '/token.class.php';
+require_once __DIR__ . '/../runtime/language.class.php';
 
 /**
  * \file        class/auth/login.class.php
@@ -62,10 +63,13 @@ class CyphtLogin
 	 * @param string $login Dolibarr username to log into Cypht as
 	 * @param string $cyphtUrl URL of the published Cypht app, need not be
 	 *                          absolute already, see absolutizeUrl()
+	 * @param string $userLang Language Dolibarr resolved for this user, e.g.
+	 *                          fr_FR. Applied only on a fresh login, which is
+	 *                          the only moment Cypht reloads the user config.
 	 * @return bool true if Cypht accepted the SSO token, or a live session
 	 *              already existed and was left alone
 	 */
-	public function performSsoLogin($login, $cyphtUrl)
+	public function performSsoLogin($login, $cyphtUrl, $userLang = '')
 	{
 		if ($this->hasLiveSsoSession($login)) {
 			return true;
@@ -81,6 +85,8 @@ class CyphtLogin
 			return false;
 		}
 
+		$this->exportUserLanguage($userLang);
+
 		require_once $apiFile;
 
 		$token = $this->token->generateSsoLoginToken($login);
@@ -91,6 +97,29 @@ class CyphtLogin
 		}
 
 		return $ok;
+	}
+
+	/**
+	 * Hand the user's language to the dolibarr_prefs module set, which reads it
+	 * while cypht_login() has the user config open.
+	 *
+	 * The environment rather than a request parameter: this runs Cypht in the
+	 * same PHP process, so there is nothing to sign and nothing to intercept.
+	 * Always written, empty included, so a stale value cannot survive a change
+	 * of setting.
+	 *
+	 * @param string $userLang Dolibarr language code
+	 * @return void
+	 */
+	private function exportUserLanguage($userLang)
+	{
+		$code = '';
+		if (getDolGlobalString('CYPHTWEBMAIL_LANG_MODE', 'follow') === 'follow') {
+			$code = CyphtLanguage::toCyphtCode($userLang);
+		}
+
+		$_ENV['DOLIBARR_USER_LANG'] = $code;
+		putenv('DOLIBARR_USER_LANG=' . $code);
 	}
 
 	/**
