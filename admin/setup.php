@@ -115,6 +115,9 @@ if ($action == 'update_settings') {
 	dolibarr_set_const($db, 'CYPHTWEBMAIL_CONTEXT_INVOICES',
 		(GETPOST('context_invoices', 'aZ09') === 'open' ? 'open' : 'unpaid'), 'chaine', 0, '', $conf->entity);
 
+	dolibarr_set_const($db, 'CYPHTWEBMAIL_LANG_MODE',
+		(GETPOST('lang_mode', 'aZ09') === 'user' ? 'user' : 'follow'), 'chaine', 0, '', $conf->entity);
+
 	if ($clamped > 0) {
 		setEventMessages($langs->trans("CyphtWebmailValueOutOfRange"), null, 'warnings');
 	}
@@ -201,6 +204,15 @@ if ($tab == 'settings') {
 	print '</td></tr>';
 
 	$numberRow("CyphtWebmailContextRows", 'context_rows', 'CYPHTWEBMAIL_CONTEXT_ROWS', 3);
+	print '</table>';
+
+	$sectionStart("CyphtWebmailInterfaceSettings");
+	print '<tr class="oddeven"><td class="titlefield">'.$label("CyphtWebmailLangMode").'</td><td>';
+	print $form->selectarray('lang_mode', array(
+		'follow' => $langs->trans("CyphtWebmailLangFollow"),
+		'user' => $langs->trans("CyphtWebmailLangUser"),
+	), getDolGlobalString('CYPHTWEBMAIL_LANG_MODE', 'follow'), 0);
+	print '</td></tr>';
 	print '</table>';
 
 	print '<div class="center" style="margin-top: 10px;">';
