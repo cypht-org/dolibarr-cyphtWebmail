@@ -7,7 +7,6 @@ Settings = Settings
 CyphtWebmailSetupPage = CyphtWebmail setup page
 NewSection=New section
 
-
 CyphtWebmailBuildTab = Build
 CyphtWebmailBuildStatus = Cypht build status
 CyphtWebmailInstalledVersion = Cypht version installed (vendor/)
@@ -60,10 +59,6 @@ CyphtWebmailMaintenanceHint = Developer tools. Releases ship already compiled, s
 CyphtWebmailModuleVersion = Module version
 CyphtWebmailVersionMismatch = built against %s, but %s is installed. Rebuild, or reinstall the release.
 
-#
-# Settings sections on the setup page. Every value here is read at runtime,
-# so saving takes effect on the next request without a rebuild.
-#
 CyphtWebmailSettingsHint = These apply straight away. Only changes under cypht/modules/ need a rebuild.
 CyphtWebmailValueOutOfRange = Some values were outside the allowed range and have been adjusted.
 
