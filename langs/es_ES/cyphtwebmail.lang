@@ -1,16 +1,13 @@
 ModulecyphtWebmailName = CyphtWebmail
-cyphtWebmailDescription = Cypht webmail integrado en Dolibarr
+
+cyphtWebmailDescription = Cypht webmail con sus contactos, plantillas de correo y fichas del remitente
 
 CyphtWebmailSetup = Configuración de CyphtWebmail
 Settings = Ajustes
 CyphtWebmailSetupPage = Página de configuración de CyphtWebmail
-NewSection = Nueva sección
+NewSection=Nueva sección
 
-CyphtWebmailImapName = Etiqueta del servidor IMAP
-CyphtWebmailImapServer = Nombre del servidor IMAP
-CyphtWebmailImapPort = Puerto del servidor IMAP
-CyphtWebmailImapTls = Usar TLS
-
+CyphtWebmailBuildTab = Compilación
 CyphtWebmailBuildStatus = Estado de compilación de Cypht
 CyphtWebmailInstalledVersion = Versión de Cypht instalada (vendor/)
 CyphtWebmailBuiltVersion = Versión de Cypht compilada
@@ -43,21 +40,61 @@ MyPageName = Nombre de mi página
 MyWidget = Mi widget
 MyWidgetDescription = Descripción de mi widget
 
-CyphtMenuWebmail = Webmail
-CyphtMenuOpenTickets = Tickets abiertos
-CyphtMenuOverdueInvoices = Facturas vencidas
-CyphtMenuTodayAgenda = Agenda
-CyphtMenuEmailCollector = Recolector de correos
-CyphtMenuEmailTemplates = Plantillas de correo
-CyphtMenuMassEmailing = Correo masivo
-CyphtMenuModuleSetup = Configuración del módulo
+CyphtMenuWebmail=Webmail
+CyphtMenuOpenTickets=Tickets abiertos
+CyphtMenuOverdueInvoices=Facturas vencidas
+CyphtMenuTodayAgenda=Agenda
+CyphtMenuEmailCollector=Recolector de correos
+CyphtMenuEmailTemplates=Plantillas de correo
+CyphtMenuMassEmailing=Correo masivo
+CyphtMenuModuleSetup=Configuración del módulo
 
-CyphtWebmailCannotBuildHere = Este servidor no puede compilar desde el navegador.
-CyphtWebmailBuildFromShell = Ejecute la compilación desde una terminal en su lugar:
-CyphtWebmailRebuildFromShell = Cypht está compilado y en ejecución. Este servidor no puede recompilarlo desde el navegador; para recompilar, ejecute esto desde la carpeta del módulo:
+CyphtWebmailCannotBuildHere=Este servidor no puede compilar desde el navegador.
+CyphtWebmailBuildFromShell=Ejecute la compilación desde una terminal en su lugar:
+CyphtWebmailRebuildFromShell=Cypht está compilado y en ejecución. Este servidor no puede recompilarlo desde el navegador; para recompilar, ejecute esto desde la carpeta del módulo:
 
 CyphtWebmailMaintenance = Mantenimiento
 CyphtWebmailMaintenanceHint = Herramientas de desarrollo. Las versiones lanzadas ya vienen compiladas, por lo que solo es necesario recompilar después de modificar algo bajo cypht/modules/.
 
 CyphtWebmailModuleVersion = Versión del módulo
 CyphtWebmailVersionMismatch = compilado con %s, pero %s está instalado. Recompile, o reinstale la versión.
+
+CyphtWebmailSettingsHint = Estos ajustes se aplican de inmediato. Solo los cambios bajo cypht/modules/ requieren recompilar.
+CyphtWebmailValueOutOfRange = Algunos valores estaban fuera del rango permitido y se han ajustado.
+
+CyphtWebmailAddressBookSettings = Libreta de direcciones
+CyphtWebmailContactsIncludeUsers = Listar las cuentas del personal
+CyphtWebmailContactsMax = Máximo de contactos cargados
+
+CyphtWebmailContextSettings = Fichas del remitente
+CyphtWebmailContextRows = Registros listados por tipo
+
+CyphtWebmailContactsIncludeUsersHelp = Añade a la libreta de direcciones del webmail a las personas que tienen una cuenta aquí, para que el personal se encuentre sin que cada compañero exista como contacto.
+CyphtWebmailContactsMaxHelp = Límite de cuántos contactos carga el webmail de una vez. Auméntelo solo si su libreta de direcciones es realmente mayor, porque la lista entera se recupera cada vez que caduca la caché.
+CyphtWebmailContextRowsHelp = Cuántos registros de cada tipo (presupuestos, pedidos, facturas, tickets, proyectos) se listan bajo el remitente. Más allá de eso solo se muestra el total.
+
+CyphtWebmailContextBlocks = Tipos de registro mostrados
+CyphtWebmailContextBlocksHelp = Qué tipos de registro se listan bajo el remitente. Un tipo cuyo módulo esté desactivado, o para el que el lector no tenga permiso, permanece oculto sea cual sea la selección.
+CyphtWebmailBlockPropal = Presupuestos
+CyphtWebmailBlockOrder = Pedidos
+CyphtWebmailBlockInvoice = Facturas
+CyphtWebmailBlockTicket = Tickets
+CyphtWebmailBlockProject = Proyectos
+CyphtWebmailContextInvoices = Facturas mostradas
+CyphtWebmailContextInvoicesHelp = Solo impagadas responde a si nos deben dinero. Todas las validadas responde a qué les hemos facturado. Reclamar un pago y consultar el historial son tareas distintas.
+CyphtWebmailInvoicesUnpaid = Solo impagadas
+CyphtWebmailInvoicesOpen = Todas las validadas
+
+CyphtWebmailInterfaceSettings = Interfaz
+CyphtWebmailLangMode = Idioma
+CyphtWebmailLangModeHelp = La primera opción aplica al webmail el idioma de la cuenta de cada usuario al iniciar sesión. La segunda deja intacto el ajuste de idioma del webmail. Un idioma para el que el webmail no tiene traducción vuelve al idioma predeterminado.
+CyphtWebmailLangFollow = Igual que su cuenta
+CyphtWebmailLangUser = Elegido en el webmail
+
+CyphtWebmailThemeMode = Claro u oscuro
+CyphtWebmailThemeModeHelp = El webmail está integrado en la página que lo rodea, así que un webmail claro dentro de una página oscura parece roto. Igualarlo sigue el mismo ajuste de modo oscuro que la página que lo rodea y lo aplica en cada inicio de sesión, por lo que un tema elegido dentro del webmail no se mantendrá.
+CyphtWebmailThemeFollow = Igualar a la página
+CyphtWebmailThemeUser = Elegido en el webmail
+
+SeeSenderRecordsInWebmail = Ver las fichas del remitente en el webmail
+CreateProspectFromWebmail = Crear un cliente potencial desde el remitente de un mensaje
