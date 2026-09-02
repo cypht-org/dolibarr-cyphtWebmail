@@ -7,7 +7,7 @@
 # Module label - key must match 'titre' in the descriptor's $this->menu entry exactly (case-sensitive)
 ModulecyphtWebmailName = CyphtWebmail
 # Module description - key must match $this->description in the descriptor exactly (case-sensitive)
-cyphtWebmailDescription = Cypht webmail integrated into Dolibarr
+cyphtWebmailDescription = Cypht webmail with your contacts, mail templates and sender records
 
 #
 # Admin page
@@ -96,13 +96,13 @@ CyphtWebmailSettingsHint = These apply straight away. Only changes under cypht/m
 CyphtWebmailValueOutOfRange = Some values were outside the allowed range and have been adjusted.
 
 CyphtWebmailAddressBookSettings = Address book
-CyphtWebmailContactsIncludeUsers = List Dolibarr users
+CyphtWebmailContactsIncludeUsers = List staff accounts
 CyphtWebmailContactsMax = Maximum contacts loaded
 
 CyphtWebmailContextSettings = Sender records
 CyphtWebmailContextRows = Records listed per type
 
-CyphtWebmailContactsIncludeUsersHelp = Adds your Dolibarr users to the webmail address book, so staff can find each other without every colleague having to exist as a contact.
+CyphtWebmailContactsIncludeUsersHelp = Adds the people who have an account here to the webmail address book, so staff can find each other without every colleague having to exist as a contact.
 CyphtWebmailContactsMaxHelp = Upper bound on how many contacts the webmail loads at once. Raise it only if your address book is genuinely larger, because the whole list is fetched each time the cache expires.
 CyphtWebmailContextRowsHelp = How many records of each kind (proposals, orders, invoices, tickets, projects) are listed under the sender. Beyond this only the count is shown.
 
@@ -117,3 +117,9 @@ CyphtWebmailContextInvoices = Invoices shown
 CyphtWebmailContextInvoicesHelp = Unpaid only answers "do they owe us money". All validated answers "what have we billed them". Chasing payment and checking history are different jobs.
 CyphtWebmailInvoicesUnpaid = Unpaid only
 CyphtWebmailInvoicesOpen = All validated
+
+CyphtWebmailInterfaceSettings = Interface
+CyphtWebmailLangMode = Language
+CyphtWebmailLangModeHelp = The first applies each user's own account language to the webmail when they sign in. The second leaves the webmail's own language setting alone. A language the webmail has no translation for falls back to the default.
+CyphtWebmailLangFollow = Same as their account
+CyphtWebmailLangUser = Chosen in the webmail
