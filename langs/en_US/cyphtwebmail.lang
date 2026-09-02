@@ -123,3 +123,11 @@ CyphtWebmailLangMode = Language
 CyphtWebmailLangModeHelp = The first applies each user's own account language to the webmail when they sign in. The second leaves the webmail's own language setting alone. A language the webmail has no translation for falls back to the default.
 CyphtWebmailLangFollow = Same as their account
 CyphtWebmailLangUser = Chosen in the webmail
+
+CyphtWebmailThemeMode = Light or dark
+CyphtWebmailThemeModeHelp = The webmail is embedded in the page around it, so a light webmail inside a dark page looks broken. Matching follows the same dark mode setting the surrounding page uses, and applies it on each sign-in, which means a theme picked inside the webmail will not stick.
+CyphtWebmailThemeFollow = Match the page around it
+CyphtWebmailThemeUser = Chosen in the webmail
+
+SeeSenderRecordsInWebmail = See the sender's records in the webmail
+CreateProspectFromWebmail = Create a prospect from a message sender
