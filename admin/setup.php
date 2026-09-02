@@ -118,6 +118,9 @@ if ($action == 'update_settings') {
 	dolibarr_set_const($db, 'CYPHTWEBMAIL_LANG_MODE',
 		(GETPOST('lang_mode', 'aZ09') === 'user' ? 'user' : 'follow'), 'chaine', 0, '', $conf->entity);
 
+	dolibarr_set_const($db, 'CYPHTWEBMAIL_THEME_MODE',
+		(GETPOST('theme_mode', 'aZ09') === 'user' ? 'user' : 'follow'), 'chaine', 0, '', $conf->entity);
+
 	if ($clamped > 0) {
 		setEventMessages($langs->trans("CyphtWebmailValueOutOfRange"), null, 'warnings');
 	}
@@ -212,6 +215,13 @@ if ($tab == 'settings') {
 		'follow' => $langs->trans("CyphtWebmailLangFollow"),
 		'user' => $langs->trans("CyphtWebmailLangUser"),
 	), getDolGlobalString('CYPHTWEBMAIL_LANG_MODE', 'follow'), 0);
+	print '</td></tr>';
+
+	print '<tr class="oddeven"><td class="titlefield">'.$label("CyphtWebmailThemeMode").'</td><td>';
+	print $form->selectarray('theme_mode', array(
+		'follow' => $langs->trans("CyphtWebmailThemeFollow"),
+		'user' => $langs->trans("CyphtWebmailThemeUser"),
+	), getDolGlobalString('CYPHTWEBMAIL_THEME_MODE', 'follow'), 0);
 	print '</td></tr>';
 	print '</table>';
 

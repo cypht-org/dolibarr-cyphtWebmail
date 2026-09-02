@@ -18,6 +18,7 @@
 require_once __DIR__ . '/../install/paths.class.php';
 require_once __DIR__ . '/token.class.php';
 require_once __DIR__ . '/../runtime/language.class.php';
+require_once __DIR__ . '/../runtime/theme.class.php';
 
 /**
  * \file        class/auth/login.class.php
@@ -64,14 +65,17 @@ class CyphtLogin
 	 * @param string $cyphtUrl URL of the published Cypht app, need not be
 	 *                          absolute already, see absolutizeUrl()
 	 * @param string $userLang Language Dolibarr resolved for this user, e.g.
-	 *                          fr_FR. Applied only on a fresh login, which is
-	 *                          the only moment Cypht reloads the user config.
+	 *                          fr_FR. Preferences reach Cypht only through a
+	 *                          fresh login, so a live session whose preferences
+	 *                          no longer match is replaced rather than reused.
 	 * @return bool true if Cypht accepted the SSO token, or a live session
 	 *              already existed and was left alone
 	 */
 	public function performSsoLogin($login, $cyphtUrl, $userLang = '')
 	{
-		if ($this->hasLiveSsoSession($login)) {
+		$prefs = $this->preferenceFingerprint($userLang);
+
+		if ($this->hasLiveSsoSession($login, $prefs)) {
 			return true;
 		}
 
@@ -85,7 +89,7 @@ class CyphtLogin
 			return false;
 		}
 
-		$this->exportUserLanguage($userLang);
+		$this->exportPreferences($userLang);
 
 		require_once $apiFile;
 
@@ -93,42 +97,94 @@ class CyphtLogin
 
 		$ok = cypht_login($login, $token, $this->absolutizeUrl($cyphtUrl));
 		if ($ok) {
-			$this->rememberSsoSession($login);
+			$this->rememberSsoSession($login, $prefs);
 		}
 
 		return $ok;
 	}
 
 	/**
-	 * Hand the user's language to the dolibarr_prefs module set, which reads it
-	 * while cypht_login() has the user config open.
+	 * The interface language to apply, empty when each user keeps their own.
 	 *
-	 * The environment rather than a request parameter: this runs Cypht in the
-	 * same PHP process, so there is nothing to sign and nothing to intercept.
-	 * Always written, empty included, so a stale value cannot survive a change
-	 * of setting.
+	 * @param string $userLang Dolibarr language code
+	 * @return string
+	 */
+	private function resolvedLanguage($userLang)
+	{
+		if (getDolGlobalString('CYPHTWEBMAIL_LANG_MODE', 'follow') !== 'follow') {
+			return '';
+		}
+
+		return CyphtLanguage::toCyphtCode($userLang);
+	}
+
+	/**
+	 * The theme to apply, empty when each user keeps their own.
+	 *
+	 * @return string
+	 */
+	private function resolvedTheme()
+	{
+		if (getDolGlobalString('CYPHTWEBMAIL_THEME_MODE', 'follow') !== 'follow') {
+			return '';
+		}
+
+		return CyphtTheme::forDarkMode(getDolGlobalInt('THEME_DARKMODEENABLED'));
+	}
+
+	/**
+	 * '1' when the dark half should be left to the browser, as it is on the
+	 * surrounding page, and '' otherwise.
+	 *
+	 * @return string
+	 */
+	private function resolvedThemeAuto()
+	{
+		if (getDolGlobalString('CYPHTWEBMAIL_THEME_MODE', 'follow') !== 'follow') {
+			return '';
+		}
+
+		return CyphtTheme::followsBrowser(getDolGlobalInt('THEME_DARKMODEENABLED')) ? '1' : '';
+	}
+
+	/**
+	 * Hand the preferences to the dolibarr_prefs module set, which reads them
+	 * while cypht_login() has the user config open.
 	 *
 	 * @param string $userLang Dolibarr language code
 	 * @return void
 	 */
-	private function exportUserLanguage($userLang)
+	private function exportPreferences($userLang)
 	{
-		$code = '';
-		if (getDolGlobalString('CYPHTWEBMAIL_LANG_MODE', 'follow') === 'follow') {
-			$code = CyphtLanguage::toCyphtCode($userLang);
-		}
+		$values = array(
+			'DOLIBARR_USER_LANG' => $this->resolvedLanguage($userLang),
+			'DOLIBARR_USER_THEME' => $this->resolvedTheme(),
+			'DOLIBARR_USER_THEME_AUTO' => $this->resolvedThemeAuto(),
+		);
 
-		$_ENV['DOLIBARR_USER_LANG'] = $code;
-		putenv('DOLIBARR_USER_LANG=' . $code);
+		foreach ($values as $key => $value) {
+			$_ENV[$key] = $value;
+			putenv($key . '=' . $value);
+		}
+	}
+
+	/**
+	 * Short digest of the preferences a login would apply right now.
+	 *
+	 * @param string $userLang Dolibarr language code
+	 * @return string
+	 */
+	private function preferenceFingerprint($userLang)
+	{
+		$parts = $this->resolvedLanguage($userLang) . '|' . $this->resolvedTheme()
+			. '|' . $this->resolvedThemeAuto();
+
+		return substr(hash('sha256', $parts), 0, 16);
 	}
 
 	/**
 	 * Give the Cypht code loaded below the same configuration public/index.php
 	 * runs with.
-	 *
-	 * api_login/api.php bootstraps Cypht itself and reaches only .env, which no
-	 * longer carries SSO_SHARED_SECRET, so Custom_Auth checked the token against
-	 * an empty secret and refused every login.
 	 *
 	 * @return bool
 	 */
@@ -142,11 +198,6 @@ class CyphtLogin
 			return false;
 		}
 
-		/* api.php leaves SITE_ID undefined, and it feeds Hm_Request_Key's
-		 * fingerprint: without it this session is fingerprinted differently
-		 * from the one the iframe validates. Minted rather than left empty,
-		 * since index.php falls back to a baked value this process cannot
-		 * see. */
 		if (!defined('SITE_ID')) {
 			$siteId = empty($_ENV['CYPHT_SITE_ID'])
 				? $this->token->getOrCreateSiteId()
@@ -177,15 +228,16 @@ class CyphtLogin
 	 * and the session file it names is still on disk.
 	 *
 	 * @param string $login
+	 * @param string $prefs Digest from preferenceFingerprint()
 	 * @return bool
 	 */
-	private function hasLiveSsoSession($login)
+	private function hasLiveSsoSession($login, $prefs = '')
 	{
 		if (empty($_COOKIE['hm_session']) || empty($_COOKIE['hm_id']) || empty($_COOKIE[$this->ssoUserCookieName()])) {
 			return false;
 		}
 
-		if (!hash_equals((string) $login, (string) $_COOKIE[$this->ssoUserCookieName()])) {
+		if (!hash_equals($login . '|' . $prefs, (string) $_COOKIE[$this->ssoUserCookieName()])) {
 			return false;
 		}
 
@@ -206,12 +258,13 @@ class CyphtLogin
 	 * Session-lifetime cookie only; it authenticates nothing itself.
 	 *
 	 * @param string $login
+	 * @param string $prefs Digest from preferenceFingerprint()
 	 * @return void
 	 */
-	private function rememberSsoSession($login)
+	private function rememberSsoSession($login, $prefs = '')
 	{
 		$secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
-		setcookie($this->ssoUserCookieName(), $login, array(
+		setcookie($this->ssoUserCookieName(), $login . '|' . $prefs, array(
 			'path' => '/',
 			'secure' => $secure,
 			'httponly' => true,
