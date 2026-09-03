@@ -93,6 +93,10 @@ class CyphtLogin
 
 		require_once $apiFile;
 
+		if (!$this->cyphtCanAuthenticate()) {
+			return false;
+		}
+
 		$token = $this->token->generateSsoLoginToken($login);
 
 		$ok = cypht_login($login, $token, $this->absolutizeUrl($cyphtUrl));
@@ -180,6 +184,41 @@ class CyphtLogin
 			. '|' . $this->resolvedThemeAuto();
 
 		return substr(hash('sha256', $parts), 0, 16);
+	}
+
+	/**
+	 * The two gates api_login/api.php:106-111 puts in front of Custom_Auth,
+	 * checked here so a failure names itself.
+	 *
+	 * Runs after api.php, which is what loads the environment and the config
+	 * classes this reads.
+	 *
+	 * @return bool
+	 */
+	private function cyphtCanAuthenticate()
+	{
+		if (!class_exists('Hm_Site_Config_File')) {
+			$this->error = 'The webmail loaded but its configuration classes did not; the build looks incomplete.';
+			return false;
+		}
+
+		$config = new Hm_Site_Config_File();
+		$modules = $config->get_modules();
+
+		if (!is_array($modules) || !in_array('site', $modules, true)) {
+			$this->error = 'The webmail module list resolved without "site", so its authentication class is never loaded. '
+				. 'config/app.php reads this through env(), which is getenv() only, so a correct .env on disk does not '
+				. 'guarantee it. Resolved ' . (is_array($modules) ? count($modules) . ' modules' : gettype($modules)) . '.';
+			return false;
+		}
+
+		$lib = $this->paths->getCyphtPath() . '/modules/site/lib.php';
+		if (!is_readable($lib)) {
+			$this->error = 'Cannot read ' . $lib . ', which declares the webmail authentication class.';
+			return false;
+		}
+
+		return true;
 	}
 
 	/**
