@@ -394,10 +394,10 @@ $version = $options['version'];
 if ($version === '') {
 	$version = CyphtPaths::readVersionFrom($staging);
 	if ($version === '') {
-		cyphtPkgFail('Could not read CYPHTWEBMAIL_VERSION from the exported version.inc.php; pass --version=X.Y.Z instead.');
+		cyphtPkgFail('Could not read CYPHTWEBMAIL_VERSION from the exported cyphtwebmail_version.inc.php; pass --version=X.Y.Z instead.');
 	}
 	cyphtPkgCheckVersion($version);
-	cyphtPkgSay('version '.$version.", from version.inc.php\n", $options['quiet']);
+	cyphtPkgSay('version '.$version.", from cyphtwebmail_version.inc.php\n", $options['quiet']);
 } else {
 	cyphtPkgSay('version '.$version.", from --version\n", $options['quiet']);
 }

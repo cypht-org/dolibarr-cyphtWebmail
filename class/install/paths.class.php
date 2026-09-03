@@ -121,7 +121,7 @@ class CyphtPaths
 	}
 
 	/**
-	 * The module's own version, from version.inc.php.
+	 * The module's own version, from cyphtwebmail_version.inc.php.
 	 *
 	 * @return string Empty when it cannot be read
 	 */
@@ -133,16 +133,12 @@ class CyphtPaths
 	/**
 	 * The same read against any module tree.
 	 *
-	 * Parsed rather than included: the packager needs the version of the tree
-	 * it exported, and including a second version.inc.php would hit the
-	 * constant this process already defined and silently return the wrong one.
-	 *
 	 * @param string $moduleRoot
 	 * @return string Empty when it cannot be read
 	 */
 	public static function readVersionFrom($moduleRoot)
 	{
-		$source = (string) @file_get_contents(rtrim($moduleRoot, '/\\') . '/version.inc.php');
+		$source = (string) @file_get_contents(rtrim($moduleRoot, '/\\') . '/cyphtwebmail_version.inc.php');
 
 		if (preg_match("/define\s*\(\s*'CYPHTWEBMAIL_VERSION'\s*,\s*'([^']+)'/", $source, $m)) {
 			return $m[1];

@@ -16,12 +16,12 @@
  */
 
 /**
- * \file        version.inc.php
+ * \file        cyphtwebmail_version.inc.php
  * \ingroup     cyphtwebmail
  * \brief       The module version. The only place it is written.
  *
- *              Same shape as Dolibarr's own htdocs/version.inc.php, which
- *              exists for exactly this and is what its packager reads.
+ *              Prefixed, because Dolibarr includes 'version.inc.php' by a
+ *              relative path and would pick this one up instead of its own.
  *
  *              The module descriptor, the trigger, build.json and the release
  *              archive name all resolve to this through

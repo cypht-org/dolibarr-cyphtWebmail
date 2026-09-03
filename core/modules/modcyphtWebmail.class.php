@@ -78,15 +78,7 @@ class modcyphtWebmail extends DolibarrModules
 		$this->editor_url = '';		// Must be an external online web site
 		$this->editor_squarred_logo = '';					// Must be image filename into the module/img directory followed with @modulename. Example: 'myimage.png@cyphtWebmail'
 
-		/* Single source, version.inc.php. The archive is named from it and
-		 * build.json records it, so a literal here would eventually disagree
-		 * with the file it shipped as. 'development' is one of Dolibarr's own
-		 * accepted values, and a version that cannot be read is closer to that
-		 * than to any number worth printing.
-		 *
-		 * Note this is no longer a literal, so Dolibarr's own
-		 * modulebuilder/build/buildzip.php cannot regex the version out of this
-		 * file. build/buildzip.php is what packages this module. */
+		/* Single source, cyphtwebmail_version.inc.php. The archive is named from it and build.json records it */
 		require_once __DIR__ . '/../../class/install/paths.class.php';
 		$cyphtModuleVersion = (new CyphtPaths())->getModuleVersion();
 		$this->version = ($cyphtModuleVersion !== '' ? $cyphtModuleVersion : 'development');
