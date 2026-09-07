@@ -29,7 +29,7 @@ require_once __DIR__ . '/../integration/contextsource.class.php';
 class CyphtEnvironment
 {
 	/**
-	 * @var string  Last error message, if any call returned false/failure.
+	 * @var string  Last error message
 	 */
 	public $error = '';
 
@@ -54,11 +54,7 @@ class CyphtEnvironment
 	}
 
 	/**
-	 * The half of the .env that owes nothing to Dolibarr.
-	 *
-	 * Static so an offline build can reach it, and shared with
-	 * buildEnvOverrides() so the two build paths cannot compile different
-	 * module lists. Contains no secrets, so it is safe to distribute.
+	 * Build-time .env values.
 	 *
 	 * @return array<string,string>
 	 */
@@ -81,8 +77,8 @@ class CyphtEnvironment
 	}
 
 	/**
-	 * buildTimeDefaults() plus everything that is per installation: database
-	 * credentials, generated secrets, data paths and bridge URLs.
+	 * buildTimeDefaults() plus the values for this install: database,
+	 * secrets, paths and bridge URLs.
 	 *
 	 * @return array<string,string>
 	 */
@@ -114,29 +110,22 @@ class CyphtEnvironment
 			'DOLIBARR_CONTACTS_TIMEOUT' => getDolGlobalString('CYPHTWEBMAIL_CONTACTS_TIMEOUT', '5'),
 			'DOLIBARR_CONTACTS_INSECURE' => getDolGlobalString('CYPHTWEBMAIL_CONTACTS_INSECURE', 'false'),
 			'DOLIBARR_MAIL_TEMPLATES_URL' => CyphtMailTemplateSource::resolveBridgeUrl(),
-			// Longer than the contacts TTL: an address book changes as people
-			// are added, a template list only when someone edits a template.
 			'DOLIBARR_MAIL_TEMPLATES_TTL' => getDolGlobalString('CYPHTWEBMAIL_MAIL_TEMPLATES_TTL', '900'),
 			'DOLIBARR_MAIL_TEMPLATES_TIMEOUT' => getDolGlobalString('CYPHTWEBMAIL_MAIL_TEMPLATES_TIMEOUT', '5'),
 			'DOLIBARR_MAIL_TEMPLATES_INSECURE' => getDolGlobalString('CYPHTWEBMAIL_MAIL_TEMPLATES_INSECURE', 'false'),
 			'DOLIBARR_CONTEXT_URL' => CyphtContextSource::resolveBridgeUrl(),
-			// Shorter than the other two: this data changes while a mailbox is open.
 			'DOLIBARR_CONTEXT_TTL' => getDolGlobalString('CYPHTWEBMAIL_CONTEXT_TTL', '120'),
-			// Cards are cached per address; this caps how many.
 			'DOLIBARR_CONTEXT_CACHE' => getDolGlobalString('CYPHTWEBMAIL_CONTEXT_CACHE', '20'),
 			'DOLIBARR_CONTEXT_TIMEOUT' => getDolGlobalString('CYPHTWEBMAIL_CONTEXT_TIMEOUT', '5'),
 			'DOLIBARR_CONTEXT_INSECURE' => getDolGlobalString('CYPHTWEBMAIL_CONTEXT_INSECURE', 'false'),
-			// The write endpoint, keyed separately from the read one.
 			'DOLIBARR_CONTEXT_CREATE_URL' => CyphtContextSource::resolveCreateUrl(),
-			// Opened with target="_top" so it escapes the webmail iframe.
 			'DOLIBARR_NEW_CONTACT_URL' => dol_buildpath('/contact/card.php', 2) . '?action=create',
 		));
 	}
 
 	/**
-	 * Write (or update) Cypht's .env file with the given overrides. Starts
-	 * from the existing .env if present, otherwise from .env.example so we
-	 * never lose the many settings we don't manage ourselves.
+	 * Write Cypht's .env with the given values. Starts from the existing
+	 * .env, or .env.example, to keep the other settings.
 	 *
 	 * @param array<string,string> $overrides Key/value pairs to force
 	 * @return bool True on success
@@ -158,14 +147,12 @@ class CyphtEnvironment
 	}
 
 	/**
-	 * The same write, without needing an instance.
+	 * Static version of writeEnvFile() for the .env part.
 	 *
 	 * @param string $cyphtPath Cypht root inside vendor/
 	 * @param array<string,string> $overrides Key/value pairs to force
 	 * @param string $error Set on failure
-	 * @param bool $fresh Start from .env.example even when a .env exists, so a
-	 *                    build cannot inherit the values of the installation it
-	 *                    happens to be running inside
+	 * @param bool $fresh Always start from .env.example
 	 * @return bool
 	 */
 	public static function writeEnvTo($cyphtPath, array $overrides, &$error = '', $fresh = false)
@@ -210,19 +197,7 @@ class CyphtEnvironment
 	}
 
 	/**
-	 * Pin the settings that decide auth, the session and the module set.
-	 *
-	 * Cypht builds its configuration by merging every config/*.php file in
-	 * glob order, then reads most values through env(), which is getenv()
-	 * only. getenv() depends on the .env having been parsed into the process
-	 * environment, which varies by SAPI and php.ini, so a correct .env on
-	 * disk does not guarantee the value arrives. Where it does not, app.php
-	 * silently substitutes upstream Cypht's defaults, whose module list has
-	 * no 'site' and whose auth_type is DB, and the module's own Custom_Auth
-	 * is then never loaded.
-	 *
-	 * Writing them as a config file instead takes them off getenv entirely.
-	 * The name sorts after app.php, which is what makes it win the merge.
+	 * Write the auth, session and module settings to a config file.
 	 *
 	 * @param string $cyphtPath Cypht root inside vendor/
 	 * @param string $error Set on failure
@@ -247,7 +222,7 @@ class CyphtEnvironment
 			return false;
 		}
 
-		/* Sorts after app.php, which is what makes it win. */
+		/* Must sort after app.php. */
 		$file = $dir . '/zz_dolibarr.php';
 		$body = "<?php\n\n/* Written by the cyphtwebmail build. Do not edit. */\n\nreturn "
 			. var_export($config, true) . ";\n";

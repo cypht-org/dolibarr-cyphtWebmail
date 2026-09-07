@@ -18,29 +18,11 @@
 /**
  * \file        class/integration/bridgeauth.class.php
  * \ingroup     cyphtWebmail
- * \brief       Who is calling a bridge/ endpoint.
- *
- *              A bridge answers two kinds of caller. The browser reaches it
- *              from the webmail iframe, which is the same origin as
- *              Dolibarr, so it arrives with the user's session cookie and
- *              main.inc.php has already authenticated: $user is real and
- *              nothing here is needed.
- *
- *              A server-to-server caller has no cookie. It signs a short
- *              lived HMAC over login, timestamp and a purpose tag, which is
- *              what this verifies. The purpose tag is what stops a token
- *              minted for one endpoint being replayed against another, so
- *              every endpoint passes its own.
- *
- *              The secret is read straight from the module's own config
- *              table, not llx_const: dolibarr_set_const() encrypts anything
- *              whose name ends in _SECRET, and the webmail reads its copy
- *              over raw PDO before Dolibarr is loaded, so the two ends would
- *              sign with different values.
+ * \brief       Token check for server-to-server calls to bridge/ endpoints.
  */
 class CyphtBridgeAuth
 {
-	/** Anti-replay window, matching Custom_Auth::check_credentials(). */
+	/** Max token age in seconds, same as Custom_Auth::check_credentials(). */
 	const WINDOW = 60;
 
 	/**

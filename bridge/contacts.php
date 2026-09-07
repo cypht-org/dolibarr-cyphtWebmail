@@ -17,14 +17,10 @@
 
 /**
  * \file        bridge/contacts.php
+ * \brief       Returns the contacts the user can see, as JSON.
  */
 
-/* Two callers, two ways in. The browser reaches this from the webmail
- * iframe, same origin as Dolibarr, so it carries the user's session cookie
- * and main.inc.php authenticates it. A server-to-server caller has no
- * cookie and signs an HMAC instead, and NOLOGIN keeps main.inc.php from
- * answering it with a login form. The choice has to be made here, before
- * main.inc.php loads. */
+// Token auth for server-to-server calls
 if (!empty($_GET['token']) || !empty($_POST['token'])) {
 	if (!defined('NOLOGIN')) {
 		define('NOLOGIN', '1');
@@ -52,7 +48,7 @@ if (!defined('NOBROWSERNOTIF')) {
 	define('NOBROWSERNOTIF', '1');
 }
 
-// Load Dolibarr environment (module lives at htdocs/custom/cyphtWebmail/bridge).
+// Load Dolibarr environment
 $res = 0;
 if (!$res && !empty($_SERVER["CONTEXT_DOCUMENT_ROOT"])) {
 	$res = @include $_SERVER["CONTEXT_DOCUMENT_ROOT"]."/main.inc.php";
@@ -71,8 +67,8 @@ if (!$res) {
 }
 
 /**
- * Emit a JSON response and stop.
-*
+ * Send a JSON response and exit.
+ *
  * @param int   $status HTTP status code
  * @param array $body   Payload to encode
  * @return void
@@ -83,7 +79,6 @@ function cyphtBridgeRespond($status, $body)
 
 	http_response_code($status);
 	header('Content-Type: application/json; charset=utf-8');
-	// Nothing here is cacheable: it is per-user data behind a 60s token.
 	header('Cache-Control: no-store, no-cache, must-revalidate');
 	header('X-Content-Type-Options: nosniff');
 	print json_encode($body);
@@ -100,7 +95,6 @@ if (!isModEnabled('cyphtwebmail')) {
 	cyphtBridgeRespond(403, array('error' => 'Module not enabled'));
 }
 
-// 'aZ09arobase' (a-z0-9_-.@) covers every character a Dolibarr login may
 $login = GETPOST('login', 'aZ09arobase');
 $token = GETPOST('token', 'aZ09');
 $search = GETPOST('search', 'alphanohtml');
@@ -109,11 +103,10 @@ $limit = GETPOSTINT('limit');
 
 // ---------------------------------------------------------------------
 
-// Read the constant directly rather than going through
 require_once __DIR__.'/../class/integration/bridgeauth.class.php';
 
 if ($token === '') {
-	/* Session mode: main.inc.php has already authenticated. */
+	/* Session cookie */
 	global $user;
 	if (empty($user->id)) {
 		cyphtBridgeRespond(403, array('error' => 'Not signed in'));
@@ -130,8 +123,6 @@ if ($token === '') {
 
 $bridgeUser->loadRights();
 
-// NOLOGIN leaves $conf->entity at its default; realign it with the user so
-// getEntity() below filters correctly under Multicompany.
 $conf->entity = ($bridgeUser->entity > 0 ? $bridgeUser->entity : 1);
 
 if (!$bridgeUser->hasRight('societe', 'lire')) {

@@ -14,10 +14,5 @@
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 
 
--- Unique, not just indexed: exactly one config row per user per entity is the
--- invariant the whole design rests on. Cypht writes this from its own process
--- with no transaction around it, so two concurrent requests could otherwise
--- insert two rows and the user would start losing settings at random
--- depending on which one a later read happened to pick up.
 ALTER TABLE llx_cyphtwebmail_userconfig ADD UNIQUE INDEX uk_cyphtwebmail_userconfig (entity, fk_user);
 ALTER TABLE llx_cyphtwebmail_userconfig ADD CONSTRAINT fk_cyphtwebmail_userconfig_fk_user FOREIGN KEY (fk_user) REFERENCES llx_user (rowid) ON DELETE CASCADE;

@@ -20,14 +20,13 @@ require_once __DIR__ . '/../install/paths.class.php';
 /**
  * \file        class/install/vendorlayout.class.php
  * \ingroup     cyphtWebmail
- * \brief       Bridges Cypht's flat-Composer layout against its own scripts,
- *              which expect a nested vendor/. Also home to the recursive
- *              copy/delete helpers CyphtPipeline::publishSite() uses.
+ * \brief       Gives Cypht's scripts the nested vendor/ they expect, and
+ *              provides copy/delete helpers for CyphtPipeline.
  */
 class CyphtVendorLayout
 {
 	/**
-	 * @var string  Last error message, if any call returned false/failure.
+	 * @var string  Last error message
 	 */
 	public $error = '';
 
@@ -45,10 +44,8 @@ class CyphtVendorLayout
 	}
 
 	/**
-	 * Cypht's scripts expect a nested vendor/autoload.php in their own package
-	 * directory; installed flat, there is none. Shims the path they expect.
-	 * Re-created every build, since Composer re-extracts the package whenever
-	 * its locked version changes.
+	 * Create vendor/autoload.php inside the Cypht package, pointing to our
+	 * autoloader. Cypht's scripts expect it there. Recreated on every build.
 	 *
 	 * @return bool
 	 */
@@ -77,12 +74,7 @@ class CyphtVendorLayout
 	}
 
 	/**
-	 * Everything Cypht reads from VENDOR_PATH off disk rather than through
-	 * the autoloader.
-	 *
-	 * Globs, not whole packages: 6.5MB of 150MB. From config_gen.php 482, 556,
-	 * 616, 618, lib/js_libs.php JS_LIBS and developer/modules.php:36. Regrep
-	 * VENDOR_PATH and JS_LIBS after a Cypht upgrade.
+	 * Files Cypht reads directly from VENDOR_PATH.
 	 *
 	 * @return array<string,string[]> Composer vendor namespace => path globs
 	 */
@@ -91,8 +83,6 @@ class CyphtVendorLayout
 		return array(
 			'twbs' => array(
 				'bootstrap/dist/css/bootstrap.min.css',
-				// Cypht's own JS is inert without it: Bootstrap drives the
-				// dropdowns and the modals Hm_Modal builds on.
 				'bootstrap/dist/js/bootstrap.bundle.min.js',
 				'bootstrap-icons/font/bootstrap-icons.css',
 				'bootstrap-icons/font/fonts/*',
@@ -100,8 +90,6 @@ class CyphtVendorLayout
 			'thomaspark' => array(
 				'bootswatch/dist/*/bootstrap.min.css',
 			),
-			// Read by the developer module, which falls back to shelling out
-			// to git when it is missing.
 			'composer' => array(
 				'installed.json',
 			),
@@ -109,11 +97,7 @@ class CyphtVendorLayout
 	}
 
 	/**
-	 * Put those assets where Cypht's scripts expect them.
-	 *
-	 * Copies, not links: a symlink needs privileges Windows withholds from
-	 * Apache, a junction needs exec(), and neither survives being zipped.
-	 * Failure is fatal here because the site just renders unstyled.
+	 * Copy those files where Cypht expects them.
 	 *
 	 * @param string $bridgeDir vendor/ inside the Cypht package
 	 * @return bool
@@ -137,7 +121,6 @@ class CyphtVendorLayout
 				continue;
 			}
 
-			// Older builds left a symlink, a junction or a full copy here.
 			if (!$this->resetDir($dest)) {
 				return false;
 			}
@@ -169,9 +152,7 @@ class CyphtVendorLayout
 	}
 
 	/**
-	 * True when every file the globs match in the source has a counterpart in
-	 * the destination. Also the post-copy check, so a partial copy is a
-	 * failure rather than a half-styled build.
+	 * True if every file matched in the source exists in the destination.
 	 *
 	 * @param string $source
 	 * @param string $dest
@@ -216,8 +197,8 @@ class CyphtVendorLayout
 	}
 
 	/**
-	 * Hash of the installed versions under a vendor namespace, so the bridge
-	 * is only rebuilt when composer actually moves one of them.
+	 * Hash of the installed package versions for a vendor, so files are only
+	 * copied again when a version changes.
 	 *
 	 * @param string $vendor Composer vendor namespace
 	 * @return string
@@ -242,9 +223,6 @@ class CyphtVendorLayout
 			}
 		}
 		if (count($parts) === 0) {
-			/* "composer" is a directory Composer writes, not a package it
-			 * lists, so nothing matches the namespace. Hash the file instead
-			 * of giving up, or that entry re-copies on every build. */
 			return md5_file($installedJson);
 		}
 		sort($parts);
@@ -253,20 +231,15 @@ class CyphtVendorLayout
 	}
 
 	/**
-	 * Clear a real directory, symlink or Windows junction and hand back an
-	 * empty directory.
-	 *
-	 * Removals run unconditionally, and success is whether mkdir() then works:
-	 * a dangling junction is invisible to is_dir(), file_exists() and lstat()
-	 * while still holding the name, so probing first is useless. Order matters,
-	 * rmdir clears a junction without following it; deleteRecursive would walk
-	 * one and delete the Bootstrap files it points at.
+	 * Remove a directory, symlink or Windows junction and create an empty
+	 * directory in its place.
 	 *
 	 * @param string $dir
 	 * @return bool
 	 */
 	private function resetDir($dir)
 	{
+		// rmdir() first: deleteRecursive() would follow a junction and delete its target.
 		if (!@unlink($dir) && !@rmdir($dir) && is_dir($dir)) {
 			$this->deleteRecursive($dir);
 		}
@@ -283,9 +256,7 @@ class CyphtVendorLayout
 	}
 
 	/**
-	 * Recursively copy a directory (Cypht's site/ output isn't huge, this
-	 * is only run when the button is clicked, not on every page load). Also
-	 * used by CyphtPipeline::publishSite().
+	 * Copy a directory recursively.
 	 *
 	 * @param string $src
 	 * @param string $dst
@@ -312,8 +283,7 @@ class CyphtVendorLayout
 	}
 
 	/**
-	 * Also used by CyphtPipeline::publishSite() to wipe the previous
-	 * published copy before publishing a fresh one.
+	 * Delete a directory recursively.
 	 *
 	 * @param string $dir
 	 * @return void

@@ -17,20 +17,11 @@
 
 /**
  * \file        bridge/mail_templates.php
- * \brief       Dolibarr email templates, for the compose screen in Cypht.
- *
- *              Visibility follows FormMail::getEMailTemplate() in
- *              htdocs/core/class/html.formmail.class.php: entity scoping plus
- *              "private = 0 OR fk_user = me". That clause is the access
- *              control, not a filter.
+ * \brief       Returns the email templates the user can see, as JSON, for
+ *              the Cypht compose screen.
  */
 
-/* Two callers, two ways in. The browser reaches this from the webmail
- * iframe, same origin as Dolibarr, so it carries the user's session cookie
- * and main.inc.php authenticates it. A server-to-server caller has no
- * cookie and signs an HMAC instead, and NOLOGIN keeps main.inc.php from
- * answering it with a login form. The choice has to be made here, before
- * main.inc.php loads. */
+// Token auth for server-to-server calls
 if (!empty($_GET['token']) || !empty($_POST['token'])) {
 	if (!defined('NOLOGIN')) {
 		define('NOLOGIN', '1');
@@ -76,7 +67,7 @@ if (!$res) {
 }
 
 /**
- * Emit a JSON response and stop.
+ * Send a JSON response and exit.
  *
  * @param int   $status HTTP status code
  * @param array $body   Payload to encode
@@ -113,7 +104,7 @@ $token = GETPOST('token', 'aZ09');
 require_once __DIR__.'/../class/integration/bridgeauth.class.php';
 
 if ($token === '') {
-	/* Session mode: main.inc.php has already authenticated. */
+	/* Session cookie */
 	global $user;
 	if (empty($user->id)) {
 		cyphtMailTemplatesRespond(403, array('error' => 'Not signed in'));
@@ -130,8 +121,6 @@ if ($token === '') {
 
 $bridgeUser->loadRights();
 
-// NOLOGIN leaves $conf->entity at its default; realign it with the user so
-// getEntity() below filters correctly under Multicompany.
 $conf->entity = ($bridgeUser->entity > 0 ? $bridgeUser->entity : 1);
 
 // ---------------------------------------------------------------------

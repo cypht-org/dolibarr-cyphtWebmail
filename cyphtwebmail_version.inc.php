@@ -18,16 +18,7 @@
 /**
  * \file        cyphtwebmail_version.inc.php
  * \ingroup     cyphtwebmail
- * \brief       The module version. The only place it is written.
- *
- *              Prefixed, because Dolibarr includes 'version.inc.php' by a
- *              relative path and would pick this one up instead of its own.
- *
- *              The module descriptor, the trigger, build.json and the release
- *              archive name all resolve to this through
- *              CyphtPaths::readVersionFrom()
- *
- *              Releasing is: edit the number here, commit, tag to match.
+ * \brief       Module version. Change it only here.
  */
 
 if (!defined('CYPHTWEBMAIL_VERSION')) {

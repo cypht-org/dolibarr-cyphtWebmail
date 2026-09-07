@@ -18,10 +18,8 @@
 /**
  * \file        index.php
  * \ingroup     cyphtWebmail
- * \brief       Entry point reached from the top menu. Logs the current
- *              Dolibarr user into Cypht via SSO (see
- *              CyphtWebmail::performSsoLogin()) before embedding the
- *              already-built app, so the iframe opens already authenticated.
+ * \brief       Webmail page. Logs the user into Cypht (SSO) and shows it in
+ *              an iframe.
  */
 
 // Load Dolibarr environment
@@ -47,32 +45,18 @@ global $conf, $db, $langs, $user;
 
 $langs->loadLangs(array("cyphtwebmail@cyphtwebmail"));
 
-// Module-level gate for this POC: any logged in user, as long as the module
-// is enabled. No dedicated permission has been added yet (task for later,
-// once we're past proving the end-to-end flow works).
 if (!isModEnabled('cyphtwebmail')) {
 	accessforbidden();
 }
 
 $manager = new CyphtWebmail($db);
 
-/* Dolibarr calls nothing when a module's files are replaced, so an upgrade has
- * to notice for itself. Normally this is a single indexed read that finds the
- * version already current and returns. The one time it does work is the first
- * request after new files land, which is exactly when nothing else would.
- *
- * A failure here is not fatal: the webmail may well still work, and refusing
- * to load would turn a partial upgrade into an outage. It is logged instead. */
 require_once __DIR__.'/class/install/upgrade.class.php';
 $cyphtUpgrade = new CyphtUpgrade($db);
 if (!$cyphtUpgrade->run()) {
 	dol_syslog('CyphtWebmail upgrade check: '.$cyphtUpgrade->error, LOG_WARNING);
 }
 
-/* Publish the address book for the webmail. The Cypht app in the iframe
- * runs in its own request and cannot reach $db or $user, so Dolibarr leaves
- * what it knows in a file for it. Here because this page is the one moment
- * both are present; costs a stat once the file is warm. */
 require_once __DIR__.'/class/install/paths.class.php';
 require_once __DIR__.'/class/integration/contactcache.class.php';
 require_once __DIR__.'/class/integration/mailtemplatecache.class.php';
@@ -88,18 +72,12 @@ if (!$cyphtTemplateCache->refresh($db, $user, $langs)) {
 	dol_syslog('CyphtWebmail mail template cache: '.$cyphtTemplateCache->error, LOG_WARNING);
 }
 
-// Current Cypht page, carried in one opaque parameter holding Cypht's own
-// query string. Nested rather than mirrored because Cypht uses page/id/uid
-// and Dolibarr uses action/id/token: merging the namespaces collides on "id".
-// Whitelisted here because it ends up in an iframe src.
 $cyphtQuery = GETPOST('cypht', 'none');
 if (!is_string($cyphtQuery) || !preg_match('/^[A-Za-z0-9_\-\.=&%+]{0,300}$/', $cyphtQuery)) {
 	$cyphtQuery = '';
 }
 
-// Must happen before any HTML output (llxHeader() included): SSO login
-// sets Cypht's hm_id/hm_session cookies via setcookie(), which silently
-// fails once headers have already been sent.
+// Must run before llxHeader(), since SSO login sets cookies.
 $ssoOk = false;
 $publicUrl = '';
 if ($manager->isPublished()) {
@@ -118,12 +96,8 @@ if (!$manager->isPublished()) {
 	print '</div>';
 } else {
 	if (!$ssoOk && $manager->error) {
-		// Non-fatal: fall back to Cypht's own login screen rather than
-		// blocking access to the page entirely.
 		print '<div class="warning" style="padding: 15px;">'.dol_escape_htmltag($manager->error).'</div>';
 	}
-	// SSO is still passed the bare $publicUrl: it parses it for the cookie
-	// domain/path, where a query string has no place.
 	$frameUrl = $publicUrl.($cyphtQuery !== '' ? '?'.$cyphtQuery : '');
 
 	print '<iframe id="cyphtwebmail-frame" src="'.dol_escape_htmltag($frameUrl).'" '.

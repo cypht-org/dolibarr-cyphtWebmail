@@ -17,6 +17,9 @@
 
 /**
  * \file        core/triggers/interface_99_modcyphtWebmail_CyphtWebmailTriggers.class.php
+ * \ingroup     cyphtWebmail
+ * \brief       Deletes or renames a user's Cypht settings file when the user
+ *              is deleted or their login changes.
  */
 require_once DOL_DOCUMENT_ROOT.'/core/triggers/dolibarrtriggers.class.php';
 require_once __DIR__.'/../../class/webmail.class.php';
@@ -34,7 +37,6 @@ class InterfaceCyphtWebmailTriggers extends DolibarrTriggers
 		$this->family = 'cyphtWebmail';
 		$this->description = 'Cleans up webmail data belonging to deleted users';
 
-		// Same single source as the module descriptor, composer.json.
 		require_once __DIR__ . '/../../class/install/paths.class.php';
 		$cyphtVersion = (new CyphtPaths())->getModuleVersion();
 		$this->version = ($cyphtVersion !== '' ? $cyphtVersion : 'development');
@@ -66,7 +68,7 @@ class InterfaceCyphtWebmailTriggers extends DolibarrTriggers
 	}
 
 	/**
-	 * Remove the settings file belonging to a deleted user.
+	 * Delete the settings file of a deleted user.
 	 *
 	 * @param User $object The user that was just deleted
 	 * @return int
@@ -75,8 +77,6 @@ class InterfaceCyphtWebmailTriggers extends DolibarrTriggers
 	{
 		$login = isset($object->login) ? $object->login : '';
 		if ($login === '') {
-			// Nothing to key the filename off. Not an error: the user row is
-			// already gone and failing here would roll the deletion back.
 			dol_syslog("cyphtWebmail: USER_DELETE with no login, skipping settings cleanup", LOG_WARNING);
 			return 0;
 		}
@@ -95,8 +95,6 @@ class InterfaceCyphtWebmailTriggers extends DolibarrTriggers
 			if (@unlink($path)) {
 				dol_syslog("cyphtWebmail: removed webmail settings for deleted user ".$login." (".$path.")");
 			} else {
-				// Not an error return: this runs inside the deletion
-				// transaction, so failing here would undo the deletion.
 				dol_syslog("cyphtWebmail: could not remove ".$path." for deleted user ".$login, LOG_ERR);
 			}
 		}
@@ -105,8 +103,8 @@ class InterfaceCyphtWebmailTriggers extends DolibarrTriggers
 	}
 
 	/**
-	 * Follow a login rename. The settings filename derives from the login,
-	 * so without this a rename orphans the file.
+	 * Rename the settings file when the login changes, since the file name
+	 * is based on the login.
 	 *
 	 * @param User $object The user that was just updated
 	 * @return int
@@ -114,7 +112,7 @@ class InterfaceCyphtWebmailTriggers extends DolibarrTriggers
 	private function onUserModify($object)
 	{
 		if (!is_object($object->oldcopy) || empty($object->oldcopy->login)) {
-			return 0; // no previous state to compare, nothing to follow
+			return 0;
 		}
 
 		$from = $object->oldcopy->login;
@@ -128,14 +126,10 @@ class InterfaceCyphtWebmailTriggers extends DolibarrTriggers
 		$target = $manager->getUserSettingsPath($to);
 
 		if (file_exists($target)) {
-			// The new login already has settings of its own. Renaming onto it
-			// would destroy them, so leave both alone and let a human decide.
 			dol_syslog("cyphtWebmail: login renamed ".$from." -> ".$to." but ".$target." already exists, not overwriting", LOG_WARNING);
 			return 0;
 		}
 
-		// Both naming schemes, oldest last: whichever exists gets moved to the
-		// current scheme, so a rename also completes a pending migration.
 		foreach (array($manager->getUserSettingsPath($from), $manager->getLegacyUserSettingsPath($from)) as $source) {
 			if (!file_exists($source)) {
 				continue;

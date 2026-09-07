@@ -1,12 +1,7 @@
 <?php
 
 /**
- * Puts Dolibarr's email templates on the Cypht compose screen: pick a type,
- * pick a template of that type, and the subject and body are filled in.
- *
- * The compose page is served with type names only. Labels and bodies arrive
- * over ajax as they are asked for, so a template the user never opens never
- * reaches the browser.
+ * Adds a Dolibarr email template picker to the Cypht compose screen.
  *
  * @package modules
  * @subpackage dolibarr_mail_templates
@@ -17,12 +12,7 @@ if (!defined('DEBUG_MODE')) { die(); }
 require_once APP_PATH.'modules/dolibarr_mail_templates/hm-dolibarr-mail-templates.php';
 
 /**
- * Loads the template list into module output, for the compose page and for the
- * ajax page behind it.
- *
- * The full list is put in output unfiltered, which keeps it available to the
- * request handler below while keeping it out of any response: Cypht emits only
- * keys named in 'allowed_output', and this one is deliberately not among them.
+ * Load the template list for the compose page and the ajax page.
  *
  * @subpackage dolibarr_mail_templates/handler
  */
@@ -42,10 +32,6 @@ class Hm_Handler_load_dolibarr_mail_templates extends Hm_Handler_Module {
 
         $status = 'ok';
 
-        /* Session cache, as in dolibarr_contacts: otherwise every compose is
-         * an HTTP round trip. Longer default TTL because templates change less
-         * than contacts. Server side, so bodies may be cached here even though
-         * they must not go into the page. */
         $cache = $this->session->get('dolibarr_mail_templates_cache', false);
         $types = $this->session->get('dolibarr_mail_templates_types', array());
         $hint = (string) $this->session->get('dolibarr_mail_templates_hint', '');
@@ -54,8 +40,6 @@ class Hm_Handler_load_dolibarr_mail_templates extends Hm_Handler_Module {
         if (!is_array($cache) || (time() - $stamp) > $source->ttl()) {
             $fetched = $source->fetch($login);
             if ($fetched === false) {
-                /* Keep serving the stale list rather than blanking the picker
-                 * mid-session; the reason is on the debug log. */
                 $status = 'error';
                 if (!is_array($cache)) {
                     $cache = array();
@@ -83,7 +67,7 @@ class Hm_Handler_load_dolibarr_mail_templates extends Hm_Handler_Module {
 }
 
 /**
- * Answers one ajax question: the templates of a type, or one template's text.
+ * Ajax: return the template list, or the text of one template.
  *
  * @subpackage dolibarr_mail_templates/handler
  */
@@ -97,8 +81,6 @@ class Hm_Handler_dolibarr_mail_templates_request extends Hm_Handler_Module {
 
         list($success, $form) = $this->process_form(array('dolibarr_template_type'));
 
-        /* An id asks for one template's text. Checked before the type branch
-         * so a request carrying both is answered with the narrower thing. */
         if (array_key_exists('dolibarr_template_id', $this->request->post)) {
             $id = (int) $this->request->post['dolibarr_template_id'];
             foreach ($templates as $template) {
@@ -113,15 +95,9 @@ class Hm_Handler_dolibarr_mail_templates_request extends Hm_Handler_Module {
                 )));
                 return;
             }
-            /* No match: an id for a template this user may not see, or one
-             * deleted since the page loaded. Say nothing rather than confirm
-             * which of those it was. */
             return;
         }
 
-        /* Index rows carry no subject and no body, only a flag for whether
-         * choosing one brings placeholders, so the picker can warn beside the
-         * name rather than after the text lands in the draft. */
         $wantsIndex = array_key_exists('dolibarr_template_index', $this->request->post);
         if (!$wantsIndex && !$success) {
             return;
@@ -159,7 +135,7 @@ class Hm_Handler_dolibarr_mail_templates_request extends Hm_Handler_Module {
 }
 
 /**
- * Renders the type and template selects above the compose fields.
+ * The "Use a template" button on the compose screen.
  *
  * @subpackage dolibarr_mail_templates/output
  */
@@ -168,9 +144,6 @@ class Hm_Output_dolibarr_mail_templates_picker extends Hm_Output_Module {
     protected function output() {
         $status = $this->get('dolibarr_mail_templates_status', 'unconfigured');
 
-        /* Nothing was wired up. Compose is the wrong place to explain a build
-         * problem, and a broken looking control is worse than none, so stay
-         * out of the way entirely. The debug log carries the detail. */
         if ($status === 'unconfigured') {
             return '';
         }
@@ -200,31 +173,20 @@ class Hm_Output_dolibarr_mail_templates_picker extends Hm_Output_Module {
 
         $count = (int) $this->get('dolibarr_mail_template_count', 0);
 
-        /* Nothing about any individual template is rendered server side, not
-         * even a name: the markup is an empty shell plus a count. site.js asks
-         * for the index when the user opens the panel, and for one template's
-         * text when they choose it. */
         $res = '<div id="dolibarr_mail_templates_picker" class="dolibarr_mail_templates_picker my-2"'.
             ' data-count="'.$count.'"'.
-            /* Translated here, not in site.js, which has no access to trans(). */
             ' data-str-loading="'.$this->html_safe($this->trans('Loading...')).'"'.
             ' data-str-empty="'.$this->html_safe($this->trans('Nothing matches that')).'"'.
             ' data-str-failed="'.$this->html_safe($this->trans('Could not load templates')).'"'.
             ' data-str-warn="'.$this->html_safe($this->trans('Contains placeholders to fill in by hand:')).'"'.
             ' data-str-flagged="'.$this->html_safe($this->trans('Contains placeholders')).'"'.
             ' data-str-inserted="'.$this->html_safe($this->trans('Template inserted')).'"'.
-            /* The dialog is built by site.js through core's Hm_Modal, so the
-             * strings it needs have to travel with the trigger. */
-            /* The dialog is a catalogue, so it is named for what it shows. The
-             * button is named for what the user wants to do. */
             ' data-str-title="'.$this->html_safe($this->trans('Email templates')).'"'.
             ' data-str-search="'.$this->html_safe($this->trans('Search templates')).'"'.
             ' data-str-preview="'.$this->html_safe($this->trans('Preview')).'"'.
             ' data-str-insert="'.$this->html_safe($this->trans('Insert')).'"'.
             '>';
 
-        /* Outlined, not solid: Send is the only filled button on this screen
-         * and should stay that way. */
         $res .= '<button type="button" id="dolibarr_mail_template_toggle" '.
             'class="btn btn-sm btn-outline-primary">'.
             '<i class="bi bi-file-earmark-text me-1"></i>'.
@@ -235,12 +197,6 @@ class Hm_Output_dolibarr_mail_templates_picker extends Hm_Output_Module {
             $this->html_safe(sprintf($this->trans('%d available'), $count)).
             '</span>';
 
-        /* The picker itself is an Hm_Modal, created on first open. Nothing for
-         * it is rendered here: core appends the dialog to <body> and site.js
-         * fills the body with a static shell it then populates. */
-
-        /* Stays on the page rather than in the dialog: the dialog closes on
-         * insert, and the offer to undo has to outlive it. */
         $res .= '<div id="dolibarr_mail_template_undo_bar" class="small mt-1" hidden="hidden">'.
             '<span id="dolibarr_mail_template_undo_text" class="text-success"></span> '.
             '<button type="button" id="dolibarr_mail_template_undo" class="btn btn-link btn-sm p-0 align-baseline">'.

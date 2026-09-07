@@ -11,8 +11,12 @@ output_source('dolibarr_prefs');
 add_module_to_all_pages('handler', 'dolibarr_theme_auto', true, 'dolibarr_prefs', 'load_theme', 'after');
 add_module_to_all_pages('output', 'dolibarr_theme_auto', true, 'dolibarr_prefs', 'theme_css', 'after');
 
+add_module_to_all_pages('handler', 'dolibarr_session_user', true, 'dolibarr_prefs', 'load_user_data', 'after');
+add_module_to_all_pages('output', 'dolibarr_session_user', true, 'dolibarr_prefs', 'theme_css', 'after');
+
 return array(
     'allowed_output' => array(
         'dolibarr_theme_auto' => array(FILTER_VALIDATE_BOOLEAN, false),
+        'dolibarr_session_user' => array(FILTER_DEFAULT, false),
     ),
 );

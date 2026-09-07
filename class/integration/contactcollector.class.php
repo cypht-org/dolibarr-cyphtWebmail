@@ -18,28 +18,13 @@
 /**
  * \file        class/integration/contactcollector.class.php
  * \ingroup     cyphtWebmail
- * \brief       Reads the address book out of Dolibarr.
- *
- *              An address here is any Dolibarr record with an email on it,
- *              from four tables: contacts, third parties, users and members.
- *              Each is capped and filtered by what $user is allowed to see,
- *              then de-duplicated on the address.
- *
- *              Two callers need this, so it lives apart from both: the
- *              cache writer, which publishes the list for the webmail to
- *              read, and bridge/contacts.php, which answers the same
- *              question over HTTP.
- *
- *              Preconditions: Dolibarr is loaded, $user has had
- *              loadRights() called, and $conf->entity matches $user, since
- *              getEntity() filters every query by it. A normal page has all
- *              three; the bridge sets the last one itself, because NOLOGIN
- *              leaves the entity at its default.
+ * \brief       Loads email addresses from Dolibarr contacts, third parties,
+ *              users and members.
  */
 class CyphtContactCollector
 {
 	/**
-	 * Every address this user may see, de-duplicated.
+	 * Get all addresses the user can see, without duplicates.
 	 *
 	 * @param DoliDB $db
 	 * @param User   $user    Must have had loadRights() called
@@ -79,9 +64,7 @@ class CyphtContactCollector
 			return null;
 		}
 
-		/* De-duplicate on address: a contact record wins over the company
-		 * generic address, because it was added first and carries a real
-		 * person's name. */
+		/* Contacts were added first, so they win over a company with the same address. */
 		$seen = array();
 		$unique = array();
 		foreach ($contacts as $contact) {
@@ -93,8 +76,6 @@ class CyphtContactCollector
 			$unique[] = $contact;
 		}
 
-		/* Each source is capped at $maxRows independently, so the ceiling is
-		 * the cap times however many actually ran. */
 		$sourcesQueried = 2 + ($includeUsers ? 1 : 0) + ($includeMembers ? 1 : 0);
 
 		return array(
@@ -106,10 +87,7 @@ class CyphtContactCollector
 	}
 
 	/**
-	 * Shape a row the way Hm_Contact expects.
-	 *
-	 * Ids are derived, not generated: Hm_Repository::add() falls back to
-	 * uniqid(), which breaks the send-to link on the next request.
+	 * Build a contact array in the format Hm_Contact expects.
 	 *
 	 * @param string $email
 	 * @param string $name
@@ -134,15 +112,13 @@ class CyphtContactCollector
 			'type' => 'dolibarr',
 			'external' => true,
 			'phone_number' => isset($extra['phone']) ? $extra['phone'] : '',
-			/* Top level, not just inside all_fields: Cypht's own templates
-			 * read it from there. */
 			'company' => isset($extra['dol_company']) ? $extra['dol_company'] : '',
 			'all_fields' => $extra,
 		);
 	}
 
 	/**
-	 * llx_socpeople.
+	 * Add contacts (llx_socpeople).
 	 *
 	 * @param DoliDB $db
 	 * @param array<int,array<string,mixed>> $contacts
@@ -157,8 +133,6 @@ class CyphtContactCollector
 		$sql .= " sp.poste, sp.fk_soc, s.nom as company";
 		$sql .= " FROM ".MAIN_DB_PREFIX."socpeople as sp";
 		$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."societe as s ON s.rowid = sp.fk_soc";
-		/* 'contact', not 'socpeople': that is the element token core itself
-		 * passes to getEntity(). */
 		$sql .= " WHERE sp.entity IN (".getEntity('contact').")";
 		$sql .= " AND sp.email IS NOT NULL AND sp.email <> ''";
 		$sql .= " AND sp.statut = 1";
@@ -195,7 +169,7 @@ class CyphtContactCollector
 	}
 
 	/**
-	 * llx_societe.
+	 * Add third parties (llx_societe).
 	 *
 	 * @param DoliDB $db
 	 * @param array<int,array<string,mixed>> $contacts
@@ -242,7 +216,7 @@ class CyphtContactCollector
 	}
 
 	/**
-	 * llx_user. Name, job and address only: a staff directory.
+	 * Add users (llx_user). Only name, job and email.
 	 *
 	 * @param DoliDB $db
 	 * @param array<int,array<string,mixed>> $contacts
@@ -255,7 +229,6 @@ class CyphtContactCollector
 	{
 		$sql = "SELECT u.rowid, u.lastname, u.firstname, u.email, u.job";
 		$sql .= " FROM ".MAIN_DB_PREFIX."user as u";
-		/* Same clause as Form::select_dolusers(), html.form.class.php:2753. */
 		$sql .= " WHERE u.entity IN (".getEntity('user').")";
 		$sql .= " AND u.email IS NOT NULL AND u.email <> ''";
 		$sql .= " AND u.statut = 1";
@@ -289,7 +262,7 @@ class CyphtContactCollector
 	}
 
 	/**
-	 * llx_adherent.
+	 * Add members (llx_adherent).
 	 *
 	 * @param DoliDB $db
 	 * @param array<int,array<string,mixed>> $contacts
@@ -304,7 +277,7 @@ class CyphtContactCollector
 		$sql .= " FROM ".MAIN_DB_PREFIX."adherent as a";
 		$sql .= " WHERE a.entity IN (".getEntity('adherent').")";
 		$sql .= " AND a.email IS NOT NULL AND a.email <> ''";
-		/* Adherent::STATUS_VALIDATED, adherent.class.php:411. */
+		/* Adherent::STATUS_VALIDATED */
 		$sql .= " AND a.statut = 1";
 		if ($like !== '') {
 			$sql .= " AND (a.email LIKE ".$like." OR a.lastname LIKE ".$like;

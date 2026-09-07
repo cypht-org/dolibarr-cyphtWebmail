@@ -13,8 +13,8 @@ From   Jane Doe <jane@acme.com>   │  Acme Corp ↗  Customer   2 Proposals €
 ```
 
 The summary does not repeat the sender's name, since the From line already
-carries it. It shows the company behind a contact, or — when the sender is the
-company — what they are to you. That label links to the record. Each chip is a
+carries it. It shows the company behind a contact, or, when the sender is the
+company, what they are to you. That label links to the record. Each chip is a
 count of something still open; clicking one expands the most recent records
 beneath, each linking to its own page.
 
@@ -34,18 +34,18 @@ individual rows do not need one:
 
 | Block | Rule |
 | --- | --- |
-| Proposals | `fk_statut = 1` — validated and still open |
-| Orders | `fk_statut IN (1, 2)` — validated or in process |
+| Proposals | `fk_statut = 1`: validated and still open |
+| Orders | `fk_statut IN (1, 2)`: validated or in process |
 | Unpaid invoices | `fk_statut = 1 AND paye = 0` |
-| Tickets | `fk_statut < 8` — below `Ticket::STATUS_CLOSED` |
-| Projects | `fk_statut = 1` — open |
+| Tickets | `fk_statut < 8`: below `Ticket::STATUS_CLOSED` |
+| Projects | `fk_statut = 1`: open |
 
 A block whose count is zero is dropped by the bridge and never reaches the
 panel. Drafts appear nowhere.
 
 ## Who the address resolves to
 
-Contact, then third party, then Dolibarr user, then member — the precedence
+Contact, then third party, then Dolibarr user, then member: the precedence
 `bridge/contacts.php` uses when de-duplicating on address, so an address held
 by both a contact and a company resolves to the person. Only the first match is
 returned.
@@ -83,8 +83,8 @@ user's Permissions tab:
 | `cyphtwebmail->context->read` | the panel appears at all |
 | `cyphtwebmail->context->create` | the **Add sender as prospect** button appears |
 
-Both are then paired with Dolibarr's own rights — `societe->lire` to read,
-`societe->creer` to create — and both must pass. The module permission decides
+Both are then paired with Dolibarr's own rights (`societe->lire` to read,
+`societe->creer` to create), and both must pass. The module permission decides
 *where* a user may see or do something; Dolibarr's right decides *whether* they
 may at all. Granting the module permission therefore cannot widen what anybody
 sees: the panel only ever shows records its reader could already open in
@@ -93,9 +93,9 @@ Dolibarr.
 A user without `context->read` gets no panel, not an error message. There is
 nothing for them to retry, so reporting a failure would be misleading.
 
-Each block is then gated twice more — on `isModEnabled()` and on the requesting
+Each block is then gated twice more, on `isModEnabled()` and on the requesting
 user's own read right (`propal->lire`, `commande->lire`, `facture->lire`,
-`ticket->read`, `projet->lire`) — so an installation without tickets, or a user
+`ticket->read`, `projet->lire`), so an installation without tickets, or a user
 without invoice rights, gets fewer blocks rather than an error.
 
 Module keys and permission names differ throughout Dolibarr; the pairs used
@@ -110,10 +110,6 @@ Requests are signed as `dolibarr_contacts` signs its own: an HMAC over
 `login|timestamp|purpose` with the shared SSO secret, valid for 60 seconds. The
 purpose tag is `context` for reads and `create` for writes, so a token minted
 for one endpoint cannot be replayed against the other.
-
-The write endpoint accepts POST only, enforces the acting user's own rights
-rather than the web server's, and is idempotent on the email address: a repeat
-returns the existing record instead of creating a second.
 
 The address being asked about is not part of the signature. The token
 establishes who is asking; the permission checks decide what they may see.

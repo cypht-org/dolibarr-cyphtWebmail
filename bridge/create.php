@@ -17,16 +17,10 @@
 
 /**
  * \file        bridge/create.php
- * \brief       Turn the sender of an email into a Dolibarr prospect.
- *              THE FIRST WRITE ENDPOINT. Everything under bridge/ before this
+ * \brief       Creates a Dolibarr prospect from an email sender.
  */
 
-/* Two callers, two ways in. The browser reaches this from the webmail
- * iframe, same origin as Dolibarr, so it carries the user's session cookie
- * and main.inc.php authenticates it. A server-to-server caller has no
- * cookie and signs an HMAC instead, and NOLOGIN keeps main.inc.php from
- * answering it with a login form. The choice has to be made here, before
- * main.inc.php loads. */
+// Token auth for server-to-server calls
 if (!empty($_GET['token']) || !empty($_POST['token'])) {
 	if (!defined('NOLOGIN')) {
 		define('NOLOGIN', '1');
@@ -54,7 +48,7 @@ if (!defined('NOBROWSERNOTIF')) {
 	define('NOBROWSERNOTIF', '1');
 }
 
-// Load Dolibarr environment (module lives at htdocs/custom/cyphtWebmail/bridge).
+// Load Dolibarr environment
 $res = 0;
 if (!$res && !empty($_SERVER["CONTEXT_DOCUMENT_ROOT"])) {
 	$res = @include $_SERVER["CONTEXT_DOCUMENT_ROOT"]."/main.inc.php";
@@ -73,7 +67,8 @@ if (!$res) {
 }
 
 /**
- * Emit a JSON response and stop.
+ * Send a JSON response and exit.
+ *
  * @param int   $status HTTP status code
  * @param array $body   Payload to encode
  * @return void
@@ -95,8 +90,9 @@ function cyphtCreateRespond($status, $body)
 }
 
 /**
- * Absolute URL of a Dolibarr page. Absolute, not root relative, because the
- * @param string $path  Path below htdocs, leading slash included
+ * Absolute URL of a Dolibarr page.
+ *
+ * @param string $path  Path below htdocs, starting with a slash
  * @param string $query Query string without the leading '?'
  * @return string
  */
@@ -115,7 +111,6 @@ if (!isModEnabled('cyphtwebmail')) {
 	cyphtCreateRespond(403, array('error' => 'Module not enabled'));
 }
 
-// POST only, checked before any input is read.
 if (empty($_SERVER['REQUEST_METHOD']) || $_SERVER['REQUEST_METHOD'] !== 'POST') {
 	header('Allow: POST');
 	cyphtCreateRespond(405, array('error' => 'POST only'));
@@ -131,12 +126,12 @@ if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
 	cyphtCreateRespond(400, array('error' => 'Missing or malformed email'));
 }
 
-// --- 1. Token ---------------------------------------------------------
+// --- 1. Authentication ------------------------------------------------
 
 require_once __DIR__.'/../class/integration/bridgeauth.class.php';
 
 if ($token === '') {
-	/* Session mode: main.inc.php has already authenticated. */
+	/* Session cookie */
 	global $user;
 	if (empty($user->id)) {
 		cyphtCreateRespond(403, array('error' => 'Not signed in'));
@@ -155,19 +150,17 @@ $bridgeUser->loadRights();
 
 $conf->entity = ($bridgeUser->entity > 0 ? $bridgeUser->entity : 1);
 
-// Module permission, then Dolibarr's own right. Both must pass.
+// --- 2. Permissions (module and third party) --------------------------
 if (!$bridgeUser->hasRight('cyphtwebmail', 'context', 'create')) {
 	cyphtCreateRespond(403, array('error' => 'User is not allowed to create records from the webmail'));
 }
 
-// The acting user's right, not the web server's.
 if (!$bridgeUser->hasRight('societe', 'creer')) {
 	cyphtCreateRespond(403, array('error' => 'User cannot create third parties'));
 }
 
-// --- 3. Already there? ------------------------------------------------
+// --- 3. Already exists? -----------------------------------------------
 
-// Idempotent on the address: checked before the insert.
 $escaped = "'".$db->escape($email)."'";
 
 $sql = "SELECT sp.rowid FROM ".MAIN_DB_PREFIX."socpeople as sp";
@@ -214,7 +207,6 @@ if ($resql) {
 
 $langs->loadLangs(array('companies', 'errors'));
 
-// No display name on the From header: fall back to the local part.
 if ($name === '') {
 	$name = substr($email, 0, strpos($email, '@'));
 }
@@ -224,7 +216,6 @@ $name = substr($name, 0, 128);
 $soc = new Societe($db);
 $soc->name = $name;
 $soc->email = $email;
-// Prospect, not customer: they have only emailed once.
 $soc->client = Societe::PROSPECT;
 $soc->fournisseur = 0;
 $soc->status = 1;
@@ -252,7 +243,6 @@ $db->commit();
 
 dol_syslog("cyphtWebmail create: third party ".$id." created from webmail for ".$email." by ".$login);
 
-// URL travels back so the dialog can link to the record.
 cyphtCreateRespond(200, array(
 	'created' => true,
 	'existing' => false,

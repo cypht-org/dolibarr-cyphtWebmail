@@ -20,19 +20,14 @@ require_once __DIR__ . '/filecache.class.php';
 /**
  * \file        class/integration/mailtemplatecache.class.php
  * \ingroup     cyphtWebmail
- * \brief       Publishes the email templates for the webmail. See
- *              CyphtFileCache for why this crosses on disk.
+ * \brief       Writes the user's email templates to a cache file for Cypht.
  */
 class CyphtMailTemplateCache extends CyphtFileCache
 {
 	const KIND = 'mail-templates';
 
 	/**
-	 * Rewrite this user's file when it is missing or older than the TTL.
-	 *
-	 * Templates are per user, not per install: the query hides other
-	 * people's private ones, and labels are resolved in $langs, which
-	 * follows whoever is logged in.
+	 * Rewrite the user's cache file if it is missing or older than the TTL.
 	 *
 	 * @param DoliDB    $db
 	 * @param User      $user

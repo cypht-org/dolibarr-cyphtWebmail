@@ -18,26 +18,7 @@
 /**
  * \file        class/integration/filecache.class.php
  * \ingroup     cyphtWebmail
- * \brief       Base for the files Dolibarr publishes for the webmail.
- *
- *              The module is two applications, not one. Dolibarr serves
- *              index.php and admin/; the vendored Cypht app serves public/
- *              and runs in its own request with its own bootstrap. Neither
- *              can call the other's API: Cypht has no $db, no $user and no
- *              Dolibarr functions, and loading main.inc.php inside it would
- *              collide with Cypht's own globals and session.
- *
- *              So anything Dolibarr knows has to be handed over. Both run
- *              as one user on one machine, so the cheapest channel is a
- *              file: Dolibarr writes it while serving its own page, where
- *              $db and $user are already at hand, and Cypht reads it while
- *              rendering.
- *
- *              The bridge/ endpoints do the same job over HTTP, for data
- *              that cannot be known before the request. That only works
- *              when nothing sits in front of Dolibarr, since the server
- *              must reach its own public URL, so prefer a cache wherever
- *              the answer can be prepared in advance.
+ * \brief       Base class for cache files Dolibarr writes for Cypht to read.
  */
 class CyphtFileCache
 {
@@ -92,8 +73,7 @@ class CyphtFileCache
 	}
 
 	/**
-	 * Write to a temp file then rename, so the reader never sees a
-	 * half written file.
+	 * Write to a temp file, then rename it.
 	 *
 	 * @param string $file
 	 * @param array<string,mixed> $data

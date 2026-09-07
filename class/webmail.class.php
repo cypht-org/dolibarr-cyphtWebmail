@@ -18,18 +18,9 @@
 /**
  * \file        class/webmail.class.php
  * \ingroup     cyphtWebmail
- * \brief       Facade over the Dolibarr<->Cypht glue code. Delegates to one
- *              collaborator per subfolder of class/:
- *
- *   class/install/paths.class.php        CyphtPaths     paths, installed/built version bookkeeping
- *   class/install/environment.class.php             CyphtEnvironment        .env overrides, writing .env
- *   class/install/vendorlayout.class.php       CyphtVendorLayout     flat-composer-dependency vendor/ bridge, recursive copy/delete
- *   class/auth/token.class.php                     CyphtToken            shared secrets and HMAC assertions
- *   class/auth/login.class.php                     CyphtLogin            functional login into Cypht
- *   class/install/moduleinstaller.class.php     CyphtModuleInstaller  installs cypht/modules/* into the vendored Cypht
- *   class/integration/contactsource.class.php   CyphtContactSource   contacts bridge URL resolution
- *   class/install/upstreampatches.class.php  CyphtUpstreamPatches  patches upstream Cypht gaps
- *   class/install/pipeline.class.php       CyphtPipeline    composer install + config_gen.php + publish
+ * \brief       Main entry point for the Dolibarr/Cypht code. Forwards calls
+ *              to the classes in class/install, class/auth and
+ *              class/integration.
  */
 
 require_once __DIR__ . '/install/paths.class.php';
@@ -50,7 +41,7 @@ class CyphtWebmail
 	public $db;
 
 	/**
-	 * @var string  Last error message, if any call returned false/failure.
+	 * @var string  Last error message
 	 */
 	public $error = '';
 
@@ -120,7 +111,7 @@ class CyphtWebmail
 	}
 
 	/**
-	 * Settings path for a user, used by the USER_DELETE trigger.
+	 * Path of a user's settings file (used by the USER_DELETE trigger).
 	 *
 	 * @param string $login Dolibarr login
 	 * @return string
@@ -299,8 +290,7 @@ class CyphtWebmail
 	}
 
 	/**
-	 * Raw NDJSON log of the most recent build attempt, same format
-	 * streamed live during runConfigGen().
+	 * Log of the last build (one JSON object per line).
 	 *
 	 * @return string
 	 */
@@ -310,31 +300,25 @@ class CyphtWebmail
 	}
 
 	/**
-	 * Force-flush all output buffers to the browser. Handles multiple
-	 * levels of output buffering and gzip compression. Stays directly on
-	 * the facade since it's generic streaming plumbing, not tied to any
-	 * one collaborator's responsibility.
+	 * Send all buffered output to the browser now.
 	 *
 	 * @return void
 	 */
 	public function cyphtwebmail_flush_now()
 	{
-		// Disable compression if it's causing buffering issues
 		if (ini_get('zlib.output_compression')) {
 			ini_set('zlib.output_compression', 'Off');
 		}
 
-		// Flush all PHP output buffers
 		while (ob_get_level() > 0) {
 			$status = ob_get_status();
 			if ($status && isset($status['name']) && $status['name'] === 'ob_gzhandler') {
-				// Don't try to flush gzip handler, it breaks
+				// Flushing the gzip handler breaks the output
 				break;
 			}
 			ob_end_flush();
 		}
 
-		// Flush the web server's buffer
 		flush();
 	}
 }

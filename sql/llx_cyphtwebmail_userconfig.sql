@@ -13,20 +13,13 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 --
--- Cypht's per-user settings and mail accounts, one row per user.
---
--- Keyed on fk_user rather than the login, so renaming a user changes nothing
--- and deletion cascades. The config column is JSON with only the mailbox
--- passwords encrypted (Hm_Crypt, CYPHTWEBMAIL_CONFIG_SECRET), which keeps
--- the rest queryable.
+-- Cypht settings and mail accounts, one row per user.
 
 
 CREATE TABLE llx_cyphtwebmail_userconfig(
 	rowid              integer AUTO_INCREMENT PRIMARY KEY NOT NULL,
 	entity             integer DEFAULT 1 NOT NULL,
 	fk_user            integer NOT NULL,
-	-- mediumtext, not text: a config with several accounts and the full
-	-- default set runs to a few KB today, and text caps at 64KB.
 	config             mediumtext,
 	date_creation      datetime NOT NULL,
 	tms                timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP

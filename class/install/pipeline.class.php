@@ -25,10 +25,8 @@ require_once __DIR__ . '/../install/moduleinstaller.class.php';
 /**
  * \file        class/install/pipeline.class.php
  * \ingroup     cyphtWebmail
- * \brief       Runs the "Generate" pipeline: composer install, Cypht's
- *              config_gen.php, then publish. Depends on CyphtEnvironment,
- *              CyphtVendorLayout and CyphtUpstreamPatches;
- *              see class/webmail.class.php for the facade.
+ * \brief       The build: composer install, Cypht's config_gen.php, then
+ *              publish to public/.
  */
 class CyphtPipeline
 {
@@ -38,7 +36,7 @@ class CyphtPipeline
 	public $db;
 
 	/**
-	 * @var string  Last error message, if any call returned false/failure.
+	 * @var string  Last error message
 	 */
 	public $error = '';
 
@@ -80,11 +78,6 @@ class CyphtPipeline
 	 * @param CyphtLogin $login
 	 * @param CyphtUpstreamPatches $upstreamPatcher
 	 * @param CyphtModuleInstaller $moduleInstaller
-	 *
-	 * $db, $envConfig and $login are nullable so an offline build can drive a
-	 * compile with no Dolibarr: runConfigGen() reads no member, publishSite()
-	 * only $paths and $vendorBridge. The few places that do need them check
-	 * for null.
 	 */
 	public function __construct(
 		$db,
@@ -105,7 +98,7 @@ class CyphtPipeline
 	}
 
 	/**
-	 * Debug log path, reset at the start of each runConfigGen() call.
+	 * Debug log path, cleared at the start of each build.
 	 *
 	 * @return string
 	 */
@@ -125,12 +118,11 @@ class CyphtPipeline
 	}
 
 	/**
-	 * Detects a sudo password prompt or a permission/access-denied error.
-	 * This module never elevates privileges; a sudo prompt would otherwise
-	 * hang until the 180s timeout since stdin is closed (see runProcess()).
+	 * Detect a sudo password prompt or a permission error in the output.
+	 * Otherwise a sudo prompt would hang until the timeout.
 	 *
-	 * @param string $text Newly-read stdout/stderr content to check.
-	 * @return string|null Human-readable reason if recognized, null otherwise.
+	 * @param string $text New output to check
+	 * @return string|null Message to show, or null
 	 */
 	private function detectPrivilegeOrCredentialPrompt($text)
 	{
@@ -161,10 +153,8 @@ class CyphtPipeline
 	}
 
 	/**
-	 * NDJSON log of the most recent build, one {t,c} object per line, in the
-	 * format streamed live to the browser. Written incrementally so the setup
-	 * page can re-display it after a reload, not only while the original
-	 * request is open.
+	 * Log of the last build, one {t,c} JSON object per line, so the setup
+	 * page can show it again after a reload.
 	 *
 	 * @return string
 	 */
@@ -174,9 +164,7 @@ class CyphtPipeline
 	}
 
 	/**
-	 * @return string Raw NDJSON content of the most recent build attempt
-	 *                that actually got past the "already running" guard,
-	 *                or '' if none has ever run.
+	 * @return string Log of the last build, or '' if none
 	 */
 	public function getLastBuildLog()
 	{
@@ -185,16 +173,13 @@ class CyphtPipeline
 	}
 
 	/**
-	 * Run a command as a subprocess without depending on symfony/process
-	 * (not guaranteed to be available to a custom module's autoloader).
+	 * Run a command and stream its output.
 	 *
-	 * @param string[]      $cmd     Command + arguments, each will be escaped
-	 * @param string        $cwd     Working directory to run the command in
-	 * @param callable|null $onChunk Optional callback(string $chunk, string $type)
-	 *                               for live streaming. $type is always 'out',
-	 *                               never 'err': Composer writes most normal
-	 *                               output to stderr, so 'err' is reserved for
-	 *                               the caller's exit-code-gated messages.
+	 * @param string[]      $cmd     Command and arguments (escaped here)
+	 * @param string        $cwd     Working directory
+	 * @param callable|null $onChunk callback(string $chunk, string $type).
+	 *                               $type is always 'out', because Composer
+	 *                               writes normal output to stderr too.
 	 * @return array{success:bool,output:string,error:string,exitcode:int}
 	 */
 	private function runProcess(array $cmd, $cwd, callable $onChunk = null)
@@ -212,8 +197,6 @@ class CyphtPipeline
 
 		$cmdline = implode(' ', array_map('escapeshellarg', $cmd));
 
-		// Real files, not pipes: pipe reads can block indefinitely on
-		// Windows, stalling the polling loop below.
 		$stdoutFile = $this->paths->getDataDir() . '/build.stdout.tmp';
 		$stderrFile = $this->paths->getDataDir() . '/build.stderr.tmp';
 		@unlink($stdoutFile);
@@ -244,8 +227,6 @@ class CyphtPipeline
 
 		fclose($pipes[0]);
 
-		// Reads whatever new bytes have appeared in a growing file since
-		// the last check, by byte offset; no pipe/stream involved at all.
 		$readNew = function ($file, &$pos) {
 			$size = @filesize($file);
 			if ($size === false || $size <= $pos) {
@@ -304,8 +285,6 @@ class CyphtPipeline
 
 			$elapsed = time() - $start;
 
-			// Checked every tick so a prompt is caught immediately instead
-			// of running into the generic 180s timeout below.
 			$promptReason = $this->detectPrivilegeOrCredentialPrompt($newOut . $newErr);
 			if ($promptReason !== null) {
 				$privilegePromptReason = $promptReason;
@@ -322,8 +301,6 @@ class CyphtPipeline
 				$this->debugLog("  still running after {$elapsed}s (pid={$status['pid']}), total output so far: " . strlen($stdout) . " stdout / " . strlen($stderr) . " stderr bytes");
 			}
 
-			// Cancel button drops this flag from a separate request; this
-			// loop is the one holding the process, so it does the killing.
 			if (file_exists($cancelFlag)) {
 				$cancelled = true;
 				$this->debugLog("  cancel flag detected after {$elapsed}s, killing pid {$status['pid']}");
@@ -338,9 +315,8 @@ class CyphtPipeline
 			if ((time() - $start) > $timeoutSeconds) {
 				$timedOut = true;
 				$this->debugLog("  TIMEOUT after {$timeoutSeconds}s, killing pid {$status['pid']}");
-				// taskkill /T kills the whole process tree; proc_terminate()
-				// alone only kills the cmd.exe wrapper proc_open() launches
-				// on Windows, leaving the real child running as an orphan.
+				// On Windows proc_terminate() only kills the cmd.exe wrapper,
+				// so use taskkill /T to kill the whole tree.
 				if (stripos(PHP_OS, 'WIN') === 0 && function_exists('exec')) {
 					$pid = $status['pid'];
 					@exec('taskkill /F /T /PID ' . ((int) $pid) . ' 2>NUL');
@@ -349,11 +325,9 @@ class CyphtPipeline
 				break;
 			}
 
-			usleep(150000); // 150ms, fine-grained enough without busy-looping
+			usleep(150000);
 		}
 
-		// Drain whatever was written in the brief window between the last
-		// read above and the process actually exiting/being terminated.
 		clearstatcache(true, $stdoutFile);
 		clearstatcache(true, $stderrFile);
 		$finalOut = $readNew($stdoutFile, $stdoutPos);
@@ -417,10 +391,7 @@ class CyphtPipeline
 	}
 
 	/**
-	 * Whether this server can build from the browser at all, and why not.
-	 *
-	 * Checked upfront so a host that withholds one of these gives an answer
-	 * and a command to run, rather than failing mid-build.
+	 * Check that this server can run the build from the browser.
 	 *
 	 * @return array{ok:bool,checks:array<int,array{label:string,ok:bool,detail:string}>}
 	 */
@@ -487,7 +458,7 @@ class CyphtPipeline
 			}
 		}
 
-		// XAMPP fallback: php.exe sits next to htdocs/ but isn't always on PATH.
+		// XAMPP fallback
 		if (!empty($_SERVER['DOCUMENT_ROOT'])) {
 			$xamppRoot = dirname(rtrim(str_replace('\\', '/', $_SERVER['DOCUMENT_ROOT']), '/'));
 			$candidate = $xamppRoot . '/php/php.exe';
@@ -500,10 +471,9 @@ class CyphtPipeline
 	}
 
 	/**
-	 * Locate a runnable Composer command: composer.phar in the module
-	 * root first, then a "composer" executable on PATH.
+	 * Find Composer: composer.phar in the module root, then "composer" on PATH.
 	 *
-	 * @return string[]|null Command prefix, or null if nothing found.
+	 * @return string[]|null Command prefix, or null if not found
 	 */
 	private function findComposerBinary()
 	{
@@ -533,8 +503,7 @@ class CyphtPipeline
 	}
 
 	/**
-	 * Copy the built site/ folder (inside vendor/, not web-exposed) into
-	 * this module's own public/ folder, which is web-exposed.
+	 * Copy the built site/ from vendor/ to the module's public/ folder.
 	 *
 	 * @return bool
 	 */
@@ -550,9 +519,6 @@ class CyphtPipeline
 		$staging = $publicPath . '.new';
 		$previous = $publicPath . '.old';
 
-		/* Leftovers from a publish that died midway. Removed rather than reused:
-		 * a half-copied staging directory would otherwise be swapped in as if it
-		 * were a finished build. */
 		foreach (array($staging, $previous) as $leftover) {
 			if (is_dir($leftover)) {
 				$this->vendorBridge->deleteRecursive($leftover);
@@ -567,15 +533,11 @@ class CyphtPipeline
 			return false;
 		}
 
-		// Rewritten before the swap, so a published public/ is never briefly
-		// carrying the build machine's path.
 		if (!$this->makeIndexRelocatable($staging . '/index.php')) {
 			$this->vendorBridge->deleteRecursive($staging);
 			return false;
 		}
 
-		/* Preferred finish: two renames, so the old copy is only destroyed once
-		 * the new one is in place. */
 		$moved = (!is_dir($publicPath) || @rename($publicPath, $previous));
 		if ($moved && @rename($staging, $publicPath)) {
 			if (is_dir($previous)) {
@@ -586,7 +548,6 @@ class CyphtPipeline
 		}
 
 		if ($moved && is_dir($previous)) {
-			// Second rename failed with the old copy already moved aside.
 			@rename($previous, $publicPath);
 		}
 
@@ -606,12 +567,7 @@ class CyphtPipeline
 
 
 	/**
-	 * Replace the one absolute path in the published entry point with an
-	 * expression that resolves itself.
-	 *
-	 * config_gen.php:658 bakes the build machine's directory into APP_PATH,
-	 * the only such path in the output, so this is what makes a build
-	 * shippable.
+	 * Make the published index.php work from any location.
 	 *
 	 * @param string $indexFile Published public/index.php
 	 * @return bool
@@ -624,11 +580,7 @@ class CyphtPipeline
 			return false;
 		}
 
-		/* 1. Self-locating APP_PATH.
-		 *
-		 * Matched on the define rather than on the path itself: the baked
-		 * value carries the build host's separators, which differ between
-		 * Windows and POSIX, and would otherwise need escaping to match. */
+		/* 1. Relative APP_PATH */
 		$content = preg_replace(
 			"/define\(\s*'APP_PATH'\s*,\s*'[^']*'\s*\);/",
 			"define('APP_PATH', dirname(__DIR__).'/vendor/jason-munro/cypht/');"
@@ -641,16 +593,12 @@ class CyphtPipeline
 		);
 
 		if ($content === null || $countPath !== 1) {
-			/* Upstream changed the shape of the define. Failing loudly beats
-			 * publishing a build that only runs on this machine. */
 			$this->error = 'Could not rewrite APP_PATH in ' . $indexFile .
 				' (matched ' . (int) $countPath . ' times). Cypht\'s entry point template may have changed.';
 			return false;
 		}
 
-		/* 2. Per-installation SITE_ID. The compiled literal stays as a
-		 * fallback: a weak site id beats not starting because the database
-		 * was briefly unreachable. */
+		/* 2. SITE_ID from the environment */
 		$content = preg_replace(
 			"/define\(\s*'SITE_ID'\s*,\s*'([^']*)'\s*\);/",
 			"define('SITE_ID', (isset(\$_ENV['CYPHT_SITE_ID']) && \$_ENV['CYPHT_SITE_ID'] !== '') ? \$_ENV['CYPHT_SITE_ID'] : '$1');",
@@ -674,7 +622,7 @@ class CyphtPipeline
 	}
 
 	/**
-	 * Lock file preventing two builds from running at once.
+	 * Lock file so only one build runs at a time.
 	 *
 	 * @return string
 	 */
@@ -684,8 +632,7 @@ class CyphtPipeline
 	}
 
 	/**
-	 * Flag file signaling a running build to stop, dropped by
-	 * requestCancel() and polled by runProcess()'s loop.
+	 * File that tells a running build to stop. Checked by runProcess().
 	 *
 	 * @return string
 	 */
@@ -695,8 +642,7 @@ class CyphtPipeline
 	}
 
 	/**
-	 * Drops the cancel flag for the running build's runProcess() loop to
-	 * pick up; does not kill anything directly.
+	 * Ask the running build to stop.
 	 *
 	 * @return array{success:bool,message:string}
 	 */
@@ -712,11 +658,9 @@ class CyphtPipeline
 	}
 
 	/**
-	 * Entry point called by the setup page: guards against overlapping
-	 * builds via a lock file, then runs the pipeline.
+	 * Run the build, unless one is already running.
 	 *
-	 * @param callable|null $onProgress callback(string $chunk), invoked
-	 *                                  live as output arrives.
+	 * @param callable|null $onProgress callback(string $chunk) for live output
 	 * @return array{success:bool,output:string,error:string}
 	 */
 	public function runConfigGen(callable $onProgress = null)
@@ -725,9 +669,6 @@ class CyphtPipeline
 		$this->debugLog('=== runConfigGen() starting ===');
 		$this->debugLog('PHP version: ' . phpversion() . ', OS: ' . PHP_OS . ', SAPI: ' . php_sapi_name());
 
-		// A build is minutes of work in one request. Without these, PHP's time
-		// limit or a closed tab kills it mid-pipeline, skipping the finally
-		// block below and stranding the lock file.
 		@set_time_limit(0);
 		@ignore_user_abort(true);
 
@@ -735,14 +676,13 @@ class CyphtPipeline
 
 		if (file_exists($lockFile)) {
 			$age = time() - (int) filemtime($lockFile);
-			// 420s covers both 180s-capped steps plus the copy step;
-			// older locks are treated as stale (crashed build) and ignored.
+			// 420s covers two 180s steps plus the copy. Older locks are ignored.
 			if ($age < 420) {
 				return array(
 					'success' => false,
 					'output' => '',
 					'error' => 'A build is already running (started ' . $age . 's ago). ' .
-						'Wait for it to finish rather than clicking Generate again. ' .
+						'Wait for it to finish. ' .
 						'If no build is actually running, this is a leftover lock from a ' .
 						'crashed build; it is ignored automatically after ' . (420 - $age) . 's, ' .
 						'or delete: ' . $lockFile,
@@ -751,12 +691,8 @@ class CyphtPipeline
 			$this->debugLog('Ignoring stale build.lock (' . $age . 's old, previous build crashed or was killed)');
 		}
 
-		// Clear a stale cancel flag so it doesn't cancel this new build immediately.
 		@unlink($this->getCancelFlagPath());
 
-		// Reset only once a build is actually about to run. Unlike
-		// debug.log above, a rejected "already running" click must not
-		// wipe the last real build's log.
 		@file_put_contents($this->getLastBuildLogPath(), '');
 
 		file_put_contents($lockFile, (string) time());
@@ -769,13 +705,11 @@ class CyphtPipeline
 	}
 
 	/**
-	 * composer install, config_gen.php, publish. Always run together: one
-	 * code path for first install, rebuild and config change alike.
+	 * Run composer install, config_gen.php and publish.
 	 *
 	 * @param callable|null $onProgress callback(string $chunk, string $type),
-	 *                                  $type being 'out' (child process
-	 *                                  output), 'info' (step headers) or
-	 *                                  'err' (gated on a real exit code).
+	 *                                  $type is 'out' (command output),
+	 *                                  'info' (step headers) or 'err'.
 	 * @return array{success:bool,output:string,error:string}
 	 */
 	private function runConfigGenSteps(callable $onProgress = null)
@@ -785,9 +719,6 @@ class CyphtPipeline
 		$log = '';
 		$emit = function ($chunk, $type = 'info') use (&$log, $onProgress) {
 			$log .= $chunk;
-			// Appended, not rewritten, so a build killed by the
-			// timeout/cancel/failure paths below still leaves a
-			// complete log up to the point it stopped.
 			@file_put_contents($this->getLastBuildLogPath(), json_encode(array('t' => $type, 'c' => $chunk))."\n", FILE_APPEND);
 			if ($onProgress !== null) {
 				$onProgress($chunk, $type);
@@ -841,11 +772,6 @@ class CyphtPipeline
 		// ---- Step 2/3: config_gen.php ----
 		$emit("\n== Step 2/3: php scripts/config_gen.php ==\n");
 
-		/* Build defaults only, on every path in. Installation values are read at
-		 * runtime by CyphtEnvBootstrap, so baking them here would tie the output
-		 * to one machine and ship its credentials in any zip. Rebuilt from
-		 * .env.example so a build cannot inherit the values of the installation
-		 * it is running inside. */
 		$envError = '';
 		if (!CyphtEnvironment::writeEnvTo($this->paths->getCyphtPath(), CyphtEnvironment::buildTimeDefaults(), $envError, true)) {
 			$this->error = $envError;
@@ -866,8 +792,7 @@ class CyphtPipeline
 		}
 		$emit("vendor/ bridge shim in place (Cypht installed as a flat dependency, see comment in the file).\n");
 
-		// Before config_gen.php: it scans modules/<name>/setup.php for every
-		// module in CYPHT_MODULES, so the files must be on disk by then.
+		// Must run before config_gen.php, which reads each module's setup.php.
 		if (!$this->moduleInstaller->installAll()) {
 			$this->error = $this->moduleInstaller->error;
 			$emit($this->error . "\n", 'err');
@@ -919,15 +844,11 @@ class CyphtPipeline
 
 		$version = $this->paths->getInstalledVersion();
 
-		// Written for every build
 		$this->paths->writeBuildInfo($version);
 
 		if ($this->db !== null) {
 			global $conf;
 
-			// main.inc.php pulls admin.lib.php in for us; master.inc.php, which
-			// is all a command line build loads, does not. Ask for it here so
-			// the build does not die on the last line after doing all the work.
 			require_once DOL_DOCUMENT_ROOT . '/core/lib/admin.lib.php';
 
 			dolibarr_set_const($this->db, 'CYPHTWEBMAIL_LAST_BUILD', dol_now(), 'chaine', 0, '', $conf->entity);

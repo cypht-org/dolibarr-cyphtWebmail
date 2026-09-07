@@ -20,25 +20,12 @@ require_once __DIR__ . '/../install/paths.class.php';
 /**
  * \file        class/install/moduleinstaller.class.php
  * \ingroup     cyphtWebmail
- * \brief       Installs this module's Cypht module sets into the vendored
- *              Cypht application.
- *
- *              Sources live in cypht/modules/<name>, laid out exactly like a
- *              native Cypht module set, and are copied into
- *              vendor/jason-munro/cypht/modules/<name> on every build, since
- *              Composer re-extracts that directory whenever the locked
- *              version changes.
- *
- *              Files are discovered rather than listed, so adding a module
- *              set, or a file to one, needs no change here. Existing files
- *              are overwritten and anything else in the destination is left
- *              alone, which is what lets "site" override one file of a module
- *              set Cypht already ships.
+ * \brief       Copies cypht/modules/<name> into the vendored Cypht.
  */
 class CyphtModuleInstaller
 {
 	/**
-	 * @var string  Last error message, if any call returned false/failure.
+	 * @var string  Last error message
 	 */
 	public $error = '';
 
@@ -56,7 +43,7 @@ class CyphtModuleInstaller
 	}
 
 	/**
-	 * Directory holding this module's Cypht module sets.
+	 * Directory of our Cypht module sets.
 	 *
 	 * @return string
 	 */
@@ -66,7 +53,7 @@ class CyphtModuleInstaller
 	}
 
 	/**
-	 * Names of every module set shipped by this module.
+	 * Names of our module sets.
 	 *
 	 * @return string[]
 	 */
@@ -122,7 +109,7 @@ class CyphtModuleInstaller
 	}
 
 	/**
-	 * Install every native like cypht module set shipped by this webmail-module.
+	 * Install all our module sets.
 	 *
 	 * @return bool
 	 */

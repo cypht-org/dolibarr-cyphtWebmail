@@ -1,11 +1,8 @@
 <?php
 
 /**
- * Read-only email template source backed by bridge/mail_templates.php in the
- * Dolibarr module. Deliberately a near copy of Hm_Dolibarr_Contacts: same
- * signing scheme, same transport, same failure handling. The two differ only
- * in the purpose tag and the env keys, and keeping them parallel is worth
- * more than the handful of lines that could be shared.
+ * Loads Dolibarr email templates: from the cache file, or from
+ * bridge/mail_templates.php. Works like Hm_Dolibarr_Contacts.
  *
  * @package modules
  * @subpackage dolibarr_mail_templates
@@ -18,28 +15,25 @@ if (!defined('DEBUG_MODE')) { die(); }
  */
 class Hm_Dolibarr_Mail_Templates {
 
-    /** @var string Endpoint URL, injected via .env at build time */
+    /** @var string Bridge URL */
     private $url;
-    /** @var string Shared HMAC secret, same one the SSO login uses */
+    /** @var string Shared HMAC secret (same as SSO) */
     private $secret;
 
     public function __construct() {
-        /* Hm_Environment::get() rather than the env() helper, for the same
-         * reason documented in the generated modules/site/lib.php. */
         $this->url = Hm_Environment::get('DOLIBARR_MAIL_TEMPLATES_URL', '');
         $this->secret = Hm_Environment::get('SSO_SHARED_SECRET', '');
     }
 
     /**
-     * @return bool true if this source has everything it needs to run
+     * @return bool true if the URL and secret are set
      */
     public function configured() {
         return $this->url !== '' && $this->secret !== '';
     }
 
     /**
-     * Seconds a fetched list stays good for. Templates change far less often
-     * than contacts, so the default is longer.
+     * How long a fetched list is kept, in seconds.
      *
      * @return int
      */
@@ -48,11 +42,10 @@ class Hm_Dolibarr_Mail_Templates {
     }
 
     /**
-     * Fetch the template list for a Dolibarr login.
+     * Get the templates for a Dolibarr login.
      *
-     * @param string $login Dolibarr username, as put in the session by SSO
-     * @return array|false array('templates' => array, 'hint' => string), or
-     *                     false on any transport or protocol failure
+     * @param string $login Dolibarr login
+     * @return array|false array('templates', 'types', 'hint'), or false on error
      */
     public function fetch($login) {
         $cached = Hm_Dolibarr_Cache::read('mail-templates', $login, 'templates');
@@ -65,8 +58,6 @@ class Hm_Dolibarr_Mail_Templates {
         }
 
         $timestamp = time();
-        /* The '|templates' tag is what stops a contacts token being replayed
-         * against this endpoint; bridge/mail_templates.php checks for it. */
         $signature = hash_hmac('sha256', $login.'|'.$timestamp.'|templates', $this->secret);
 
         $url = $this->url.(strpos($this->url, '?') === false ? '?' : '&');
@@ -90,11 +81,7 @@ class Hm_Dolibarr_Mail_Templates {
     }
 
     /**
-     * The picker's shape, from either source.
-     *
-     * Types come already labelled and counted, so the picker does not derive
-     * them from the template list and get the ordering or labels subtly
-     * different.
+     * Keep only the keys the picker uses.
      *
      * @param array $data
      * @return array
@@ -108,8 +95,8 @@ class Hm_Dolibarr_Mail_Templates {
     }
 
     /**
-     * @param string $url Fully built, signed request URL
-     * @return string|false Response body, or false on transport failure
+     * @param string $url Signed request URL
+     * @return string|false Response body, or false on failure
      */
     private function request($url) {
         $timeout = (int) Hm_Environment::get('DOLIBARR_MAIL_TEMPLATES_TIMEOUT', 5);
@@ -119,19 +106,14 @@ class Hm_Dolibarr_Mail_Templates {
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
             curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
-            /* The token is short lived but still a bearer credential, so
-             * never follow a redirect that could carry it off-host. */
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
-            /* HTTP auth in front of Dolibarr answers 401 before the request
-             * reaches PHP, so send credentials when one is configured. */
+            /* For sites with HTTP auth in front of Dolibarr. */
             $proxyAuth = Hm_Environment::get('DOLIBARR_BRIDGE_HTTP_AUTH', '');
             if ($proxyAuth !== '') {
                 curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
                 curl_setopt($ch, CURLOPT_USERPWD, $proxyAuth);
             }
             if (Hm_Environment::get('DOLIBARR_MAIL_TEMPLATES_INSECURE', 'false') === 'true') {
-                /* For local XAMPP setups serving Dolibarr over a self-signed
-                 * certificate. Off by default. */
                 curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
                 curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
             }

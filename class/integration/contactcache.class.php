@@ -20,15 +20,14 @@ require_once __DIR__ . '/filecache.class.php';
 /**
  * \file        class/integration/contactcache.class.php
  * \ingroup     cyphtWebmail
- * \brief       Publishes the address book for the webmail. See
- *              CyphtFileCache for why this crosses on disk.
+ * \brief       Writes the user's contacts to a cache file for Cypht.
  */
 class CyphtContactCache extends CyphtFileCache
 {
 	const KIND = 'contacts';
 
 	/**
-	 * Rewrite this user's file when it is missing or older than the TTL.
+	 * Rewrite the user's cache file if it is missing or older than the TTL.
 	 *
 	 * @param DoliDB $db
 	 * @param User   $user  The logged in user, rights already loaded

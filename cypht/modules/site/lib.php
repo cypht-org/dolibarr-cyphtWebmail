@@ -1,15 +1,7 @@
 <?php
 
 /**
- * Installed by CyphtModuleInstaller from cypht/modules/site/lib.php.
- *
- * AUTH_TYPE=custom routes credential checking to Custom_Auth below, using
- * a short-lived HMAC token instead of a real mailbox password.
- *
- * SESSION_TYPE=custom activates Custom_Session below, storing session data
- * in its own files rather than PHP's native session_start()/$_SESSION,
- * since performSsoLogin() runs inside Dolibarr's own already-active
- * session and Cypht's stock "PHP" session type would collide with it.
+ * Custom session, auth and user config classes for Cypht.
  *
  * @package modules
  * @subpackage site
@@ -18,15 +10,10 @@ class Custom_Session extends Hm_Session {
 
     use Hm_Session_Auth;
 
-    /** @var bool true once a new login has established data to persist */
+    /** @var bool true when resuming an existing session */
     private $existing = false;
 
     private function session_dir() {
-        // Hm_Environment::get() reads $_ENV directly. The global env()
-        // helper instead reads getenv(), backed by a process-wide table
-        // that putenv() is not thread-safe for; on Windows (Apache
-        // mpm_winnt, one process/many threads) a concurrent request could
-        // observe it mid-update and fall back to the wrong directory.
         $base = dirname(rtrim(Hm_Environment::get('USER_SETTINGS_DIR', sys_get_temp_dir()), '/\\'));
         $dir = $base.'/sso_sessions';
         if (!is_dir($dir)) {
@@ -40,11 +27,8 @@ class Custom_Session extends Hm_Session {
     }
 
     /**
-     * Diagnostic log for pinning a hung/crashed request to an exact line
-     * even when it returns a raw 503 with no catchable PHP error.
-     *
-     * Leave SESSION_DEBUG off outside of active debugging: 18 call sites,
-     * roughly 100KB per user per day, all appended to one shared file.
+     * Debug log for session problems. Only enable SESSION_DEBUG while
+     * debugging, the file grows quickly.
      */
     private function dbg($line) {
         if (Hm_Environment::get('SESSION_DEBUG', 'false') !== 'true') {
@@ -52,8 +36,6 @@ class Custom_Session extends Hm_Session {
         }
         $uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '?';
         $method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : '?';
-        // Written under the module root, not USER_SETTINGS_DIR, so it's
-        // directly reachable on disk.
         $logPath = dirname(rtrim(APP_PATH, '/\\'), 3) . '/session_debug.log';
         @file_put_contents(
             $logPath,
@@ -199,7 +181,7 @@ class Custom_Session extends Hm_Session {
     }
 
     /**
-     * Persists and closes the session early, before a slow operation
+     * Save and close the session early, before a slow operation.
      */
     public function close_early() {
         if ($this->active && !$this->session_closed) {
@@ -210,7 +192,6 @@ class Custom_Session extends Hm_Session {
     }
 
     private function write_locked() {
-        // Exclusive lock, same reasoning as start() above.
         $fh = @fopen($this->session_file($this->session_key), 'cb');
         if ($fh !== false) {
             flock($fh, LOCK_EX);
@@ -238,14 +219,12 @@ class Custom_Session extends Hm_Session {
 class Custom_Auth extends Hm_Auth_DB {
 
     /**
-     * @param string $user username (the Dolibarr login)
+     * @param string $user Dolibarr login
      * @param string $pass "{timestamp}.{hmac}" token from
-     *                      CyphtToken::generateSsoLoginToken(), not a
-     *                      real password
-     * @return bool true if the token is a valid, fresh SSO assertion
+     *                      CyphtToken::generateSsoLoginToken()
+     * @return bool true if the token is valid and not expired
      */
     public function check_credentials($user, $pass) {
-        // See Custom_Session::session_dir() above re: avoiding env().
         $secret = Hm_Environment::get('SSO_SHARED_SECRET', '');
         if ($secret === '' || strpos($pass, '.') === false) {
             return false;
@@ -256,7 +235,6 @@ class Custom_Auth extends Hm_Auth_DB {
             return false;
         }
 
-        // Anti-replay window: a captured token is only valid for a minute.
         if (abs(time() - (int) $timestamp) > 60) {
             return false;
         }
@@ -268,36 +246,36 @@ class Custom_Auth extends Hm_Auth_DB {
 }
 
 /**
- * Replaces Hm_User_Config_File as the user-settings backend (via
- * USER_CONFIG_TYPE=custom:Custom_User_Config in .env).
+ * Stores user settings in llx_cyphtwebmail_userconfig
+ * (USER_CONFIG_TYPE=custom:Custom_User_Config).
  *
  * @package modules
  * @subpackage site
  */
 class Custom_User_Config extends Hm_Config {
 
-    /** @var object Hm_Site_Config_File-like site config */
+    /** @var object Site config */
     private $site_config;
 
-    /** @var string current username, set on load()/reload() */
+    /** @var string Current username */
     private $username;
 
-    /** @var bool a set() happened since the last write */
+    /** @var bool Changed since the last save */
     private $dirty = false;
 
-    /** @var bool shutdown flush already registered for this request */
+    /** @var bool Shutdown save already registered */
     private $flush_registered = false;
 
-    /** @var object|null PDO handle onto Dolibarr's database */
+    /** @var object|null Database handle */
     private $dbh = null;
 
-    /** @var int|null Dolibarr user id, resolved once from the login */
+    /** @var int|null Dolibarr user id */
     private $fk_user = null;
 
-    /** @var int Dolibarr entity the user belongs to */
+    /** @var int Dolibarr entity of the user */
     private $entity = 1;
 
-    /** @var bool this config came from a pre-database file, delete it once written */
+    /** @var bool Loaded from an old settings file, delete it after saving */
     private $migrated_from_file = false;
 
     public function __construct($config) {
@@ -306,7 +284,7 @@ class Custom_User_Config extends Hm_Config {
     }
 
     /**
-     * Settings file for a user.
+     * Old settings file of a user (before settings moved to the database).
      *
      * @param string $username
      * @return string
@@ -321,8 +299,7 @@ class Custom_User_Config extends Hm_Config {
     }
 
     /**
-     * Pre-collision-fix filename, still read once so nobody loses their
-     * settings on upgrade. The next save() writes the new path.
+     * Even older file name, without the hash.
      *
      * @param string $username
      * @return string
@@ -335,12 +312,10 @@ class Custom_User_Config extends Hm_Config {
     }
 
     /**
+     * Load the user's settings from the database, or from an old file.
+     *
      * @param string $username username
-     * @param string $key intentionally ignored, see class doc comment
-     */
-    /**
-     * @param string $username username
-     * @param string $key intentionally ignored, see class doc comment
+     * @param string $key not used
      */
     public function load($username, $key = null) {
         $this->username = $username;
@@ -367,8 +342,7 @@ class Custom_User_Config extends Hm_Config {
     }
 
     /**
-     * PDO handle onto Dolibarr's database, via Cypht's own DB layer. The
-     * DB_* settings are written into .env from $conf->db at build time.
+     * Connection to the Dolibarr database, using Cypht's DB_* settings.
      *
      * @return object|false
      */
@@ -384,22 +358,19 @@ class Custom_User_Config extends Hm_Config {
     }
 
     /**
-     * Dolibarr table prefix. Configurable in conf.php, so never assumed.
+     * Dolibarr table prefix.
      *
      * @return string
      */
     private function prefix() {
         $prefix = (string) Hm_Environment::get('DOLIBARR_DB_PREFIX', 'llx_');
 
-        // Interpolated into SQL, so it is constrained rather than trusted.
+        // Used directly in SQL, so keep only safe characters.
         return preg_replace('/[^a-zA-Z0-9_]/', '', $prefix);
     }
 
     /**
-     * Resolve a login to the Dolibarr user id and entity.
-     *
-     * The config row is keyed on the numeric id, not the login, which is
-     * what makes renaming a user a non-event here.
+     * Get the Dolibarr user id and entity for a login.
      *
      * @param string $username
      * @return array|false [fk_user, entity]
@@ -455,7 +426,7 @@ class Custom_User_Config extends Hm_Config {
     }
 
     /**
-     * Read the pre-database settings file, newest naming scheme first.
+     * Read an old settings file, if there is one.
      *
      * @param string $username
      * @return string|false
@@ -478,7 +449,9 @@ class Custom_User_Config extends Hm_Config {
     }
 
     /**
-     * @param string $raw Stored payload
+     * Return the settings as JSON. Older versions encrypted the whole thing.
+     *
+     * @param string $raw Stored value
      * @param string $username
      * @return string JSON
      */
@@ -504,14 +477,12 @@ class Custom_User_Config extends Hm_Config {
     }
 
     /**
-     * Marker on an encrypted password, so decrypt_passwords() can tell a
-     * ciphertext from a password that happens to look like base64.
+     * Prefix of encrypted passwords.
      */
     const PASS_PREFIX = 'enc:v1:';
 
     /**
-     * Encrypt just the mailbox passwords, leaving the rest of the config as
-     * readable JSON so the column stays queryable.
+     * Encrypt the mailbox passwords. The rest stays as plain JSON.
      *
      * @param array $config
      * @return array
@@ -540,8 +511,7 @@ class Custom_User_Config extends Hm_Config {
     }
 
     /**
-     * Reverse of encrypt_passwords(). Values without the marker are passed
-     * through untouched, so a config written before this existed still works.
+     * Decrypt the mailbox passwords.
      *
      * @param array $config
      * @return array
@@ -563,10 +533,7 @@ class Custom_User_Config extends Hm_Config {
                     continue;
                 }
                 $plain = Hm_Crypt::plaintext(substr($server['pass'], strlen(self::PASS_PREFIX)), $secret);
-                // A failure means the key changed. Blanking it makes Cypht
-                // prompt for the password again, which is recoverable;
-                // leaving ciphertext in place would send it to the mail
-                // server as if it were the password.
+                // If decryption fails, clear it so Cypht asks for the password again.
                 $config[$key][$index]['pass'] = ($plain === false ? '' : $plain);
             }
         }
@@ -575,8 +542,7 @@ class Custom_User_Config extends Hm_Config {
     }
 
     /**
-     * Delete the file a user's settings came from, once they are safely in
-     * the table. Only ever called after a successful write.
+     * Delete the old settings file after the settings were saved to the database.
      *
      * @param string $username
      * @return void
@@ -595,10 +561,7 @@ class Custom_User_Config extends Hm_Config {
 
 
     /**
-     * Server-held key for the settings file, injected from Dolibarr's
-     * llx_const via .env. Empty means the module was built before this
-     * existed, in which case we fall back to writing clear text rather than
-     * losing the user's settings outright.
+     * Key used to encrypt passwords. If empty, passwords are stored unencrypted.
      *
      * @return string
      */
@@ -607,10 +570,7 @@ class Custom_User_Config extends Hm_Config {
     }
 
     /**
-     * Called from Cypht's load_user_data handler with whatever the session
-     * holds. Also persists, for the same reason Tiki's integration does
-     * (Tiki_Hm_User_Config::reload): nothing in this setup ever warns the
-     * user about unsaved settings before the session ends.
+     * Load the session data and save it, like Tiki_Hm_User_Config::reload().
      *
      * @param array $data new user data
      * @param string|false $username
@@ -634,12 +594,10 @@ class Custom_User_Config extends Hm_Config {
 
 
     /**
-     * Strip values that change every request but carry no meaning once
-     * reloaded, so comparing two configs answers "did anything the user cares
-     * about change" rather than "is this a different request".
+     * Config as a string to compare, minus the per-request values.
      *
      * @param array $config
-     * @return string Canonical form, safe to compare with ===
+     * @return string
      */
     private function comparable($config) {
         unset($config['updated_at']);
@@ -659,7 +617,7 @@ class Custom_User_Config extends Hm_Config {
     }
 
     /**
-     * Persist on every single write.
+     * Set a value. It is saved at the end of the request.
      *
      * @param string $name config value name
      * @param mixed $value config value
@@ -679,8 +637,8 @@ class Custom_User_Config extends Hm_Config {
     }
 
     /**
-     * Write once at end of request if any set() marked the config dirty.
-     * Public because register_shutdown_function() needs to reach it.
+     * Save at the end of the request if something changed. Public because
+     * register_shutdown_function() calls it.
      */
     public function flush_pending() {
         if (!$this->dirty || !$this->username) {
@@ -690,7 +648,6 @@ class Custom_User_Config extends Hm_Config {
 
         ob_start();
         try {
-            // Reuses $this->dbh
             $raw = $this->db_load($this->username);
             $existing = ($raw === false || $raw === '') ? array() : $this->decode($raw);
             if (!is_array($existing)) {
@@ -700,7 +657,7 @@ class Custom_User_Config extends Hm_Config {
 
             if ($this->comparable($existing) === $this->comparable($this->config)) {
                 ob_end_clean();
-                return; // nothing meaningful changed, skip the write entirely
+                return;
             }
 
             if (!empty($existing['updated_at']) && !empty($this->config['updated_at'])
@@ -720,7 +677,7 @@ class Custom_User_Config extends Hm_Config {
 
     /**
      * @param string $username username
-     * @param string $key intentionally ignored, see class doc comment
+     * @param string $key not used
      */
     public function save($username, $key = null) {
         $this->dirty = false;
@@ -728,11 +685,9 @@ class Custom_User_Config extends Hm_Config {
 
         $removed = $this->filter_servers();
 
-        // Stamped so reload() above can tell which copy is newer.
         $this->config['updated_at'] = microtime(true);
         ksort($this->config);
 
-        // Readable JSON with only the passwords encrypted. This is the single store for accounts and settings
         $payload = json_encode($this->encrypt_passwords($this->config));
 
         if ($this->db_save($username, $payload)) {
@@ -743,10 +698,10 @@ class Custom_User_Config extends Hm_Config {
     }
 
     /**
-     * Upsert the config row.
+     * Update or insert the user's config row.
      *
      * @param string $username
-     * @param string $payload Encrypted config
+     * @param string $payload Config JSON
      * @return bool
      */
     private function db_save($username, $payload) {
@@ -789,16 +744,8 @@ class Custom_User_Config extends Hm_Config {
     }
 
     /**
-     * Clear transient per-request state off server entries before they are
-     * written, then hand the rest to the parent implementation. Copied from
-     * Tiki_Hm_User_Config::filter_servers: 'object' holds a live connection
-     * handle and 'connected' a socket state, neither of which means anything
-     * once reloaded, and both of which bloat the stored blob.
-     * Clear transient per-request state off server entries before they are
-     * stored, then hand the rest to the parent implementation.
-     *
-     * Must not remove servers: this config is the only store, so anything
-     * dropped here is deleted permanently.
+     * Clear the connection state ('object', 'connected') of each server
+     * before saving (like Tiki_Hm_User_Config::filter_servers).
      *
      * @return array
      */
@@ -819,7 +766,7 @@ class Custom_User_Config extends Hm_Config {
 }
 
 /**
- * Reads the files Dolibarr publishes under DOLIBARR_CACHE_DIR.
+ * Reads the cache files Dolibarr writes in DOLIBARR_CACHE_DIR.
  *
  * @subpackage site/lib
  */

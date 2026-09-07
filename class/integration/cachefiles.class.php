@@ -18,21 +18,12 @@
 /**
  * \file        class/integration/cachefiles.class.php
  * \ingroup     cyphtWebmail
- * \brief       Where the files Dolibarr publishes for the webmail live.
- *
- *              Both halves of the module need these names: the Dolibarr
- *              side to write, the Cypht side to read. They run in separate
- *              requests and share no bootstrap, so this file is written to
- *              be loadable from either, and deliberately depends on nothing
- *              at all: no Dolibarr functions, no Cypht classes, no globals.
- *
- *              The Cypht side finds it through DOLIBARR_MODULE_ROOT, which
- *              CyphtEnvBootstrap exports.
+ * \brief       Cache file paths, shared by Dolibarr (writer) and Cypht (reader).
  */
 class CyphtCacheFiles
 {
 	/**
-	 * A login reduced to characters that are safe in a file name.
+	 * Make a login safe to use in a file name.
 	 *
 	 * @param string $login
 	 * @return string
@@ -54,7 +45,7 @@ class CyphtCacheFiles
 	}
 
 	/**
-	 * Decode one cache file, for the Cypht half.
+	 * Read and decode a cache file (Cypht side).
 	 *
 	 * @param string $dir
 	 * @param string $login

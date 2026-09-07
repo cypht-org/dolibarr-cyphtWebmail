@@ -13,14 +13,7 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 --
--- Migration 001: the module configuration table.
---
--- Duplicates sql/llx_cyphtwebmail_config.sql on purpose: that file is only
--- read on activation, and a files only upgrade never activates.
---
--- Ordering works because CyphtConfig::get() returns its default when the
--- table is missing: the read fails, this creates it, the version goes in.
--- Re-runnable; run_sql() lets "already exists" pass.
+-- Migration 001: module configuration table.
 
 CREATE TABLE llx_cyphtwebmail_config(
 	rowid              integer AUTO_INCREMENT PRIMARY KEY NOT NULL,

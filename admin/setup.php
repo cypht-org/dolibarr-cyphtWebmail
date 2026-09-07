@@ -18,8 +18,7 @@
 /**
  * \file        admin/setup.php
  * \ingroup     cyphtWebmail
- * \brief       Setup page: webmail settings, build status and the
- *              "Generate / Rebuild" button that runs Cypht's config_gen.php.
+ * \brief       Setup page: settings, build status and the Generate button.
  */
 
 // Load Dolibarr environment
@@ -53,7 +52,7 @@ if (!$user->admin) {
 $langs->loadLangs(array("admin", "cyphtwebmail@cyphtwebmail"));
 
 /**
- * The record kinds the sender panel can show, in display order.
+ * Record types the sender panel can show, in display order.
  *
  * @return string[]
  */
@@ -63,7 +62,6 @@ function cyphtContextBlockKeys()
 }
 
 $action = GETPOST('action', 'aZ09');
-// Two tabs, so the settings are not buried under the build report.
 $tab = GETPOST('tab', 'aZ09');
 if ($tab !== 'build') {
 	$tab = 'settings';
@@ -71,9 +69,6 @@ if ($tab !== 'build') {
 $manager = new CyphtWebmail($db);
 $buildResult = null;
 
-// Same self-triggering upgrade check as the webmail entry point: an admin
-// opening this page after replacing the files should not have to know that
-// disabling and re-enabling the module is what applies them.
 require_once __DIR__.'/../class/install/upgrade.class.php';
 $cyphtUpgrade = new CyphtUpgrade($db);
 if (!$cyphtUpgrade->run()) {
@@ -81,11 +76,10 @@ if (!$cyphtUpgrade->run()) {
 }
 
 if ($action == 'update_settings') {
-	// Constant => [posted field, min, max]. A value outside the range is
-	// clamped rather than refused: these are number boxes, not free text.
+	// Constant => [field, min, max]
 	$numbers = array(
 		'CYPHTWEBMAIL_CONTACTS_MAX' => array('contacts_max', 1, 100000),
-		// 10 is the ceiling bridge/context.php enforces; do not offer more here.
+		// bridge/context.php allows 10 at most.
 		'CYPHTWEBMAIL_CONTEXT_ROWS' => array('context_rows', 1, 10),
 	);
 
@@ -108,7 +102,6 @@ if ($action == 'update_settings') {
 			$chosen[] = $key;
 		}
 	}
-	// 'none' rather than '', which the bridge cannot tell from "never saved".
 	dolibarr_set_const($db, 'CYPHTWEBMAIL_CONTEXT_BLOCKS',
 		(empty($chosen) ? 'none' : implode(',', $chosen)), 'chaine', 0, '', $conf->entity);
 
@@ -131,7 +124,6 @@ if ($action == 'update_settings') {
 
 $form = new Form($db);
 
-// Computed once and reused for every form/JS call on this page.
 $formToken = newToken();
 
 llxHeader('', $langs->trans("CyphtWebmailSetup"));
@@ -156,7 +148,6 @@ if ($tab == 'settings') {
 	print '<input type="hidden" name="token" value="'.$formToken.'">';
 	print '<input type="hidden" name="action" value="update_settings">';
 
-	// Every label carries its own explanation, so the page needs no manual.
 	$label = function ($key) use ($langs, $form) {
 		return $form->textwithpicto($langs->trans($key), $langs->trans($key.'Help'));
 	};
@@ -260,8 +251,6 @@ if ($tab == 'build') {
 	$builtVersion = (!empty($buildInfo['cypht_version'])) ? $buildInfo['cypht_version'] : $manager->getBuiltVersion();
 	if ($builtVersion) {
 		print dol_escape_htmltag($builtVersion);
-		// Catches running composer update underneath a compiled build:
-		// public/ was generated against one Cypht and vendor/ now holds another.
 		if ($installedVersion && $installedVersion !== $builtVersion) {
 			print ' <span class="warning">'.$langs->trans("CyphtWebmailVersionMismatch", $builtVersion, $installedVersion).'</span>';
 		}
@@ -297,9 +286,6 @@ if ($tab == 'build') {
 	$devMode = empty($dolibarr_main_prod) || getDolGlobalInt('CYPHTWEBMAIL_ENABLE_BUILD');
 	$showBuildControls = $canBuildHere && $devMode;
 
-	// Nothing published means the webmail cannot run at all. That is worth saying
-	// in any mode, so this warning is deliberately not behind $devMode:
-	// a production install that has never been built is broken, and the admin needs to know why.
 	if (!$canBuildHere && !$published) {
 		print '<div class="warning" style="padding: 12px; margin-top: 10px;">';
 		print '<strong>'.$langs->trans("CyphtWebmailCannotBuildHere").'</strong><br><br>';
@@ -349,9 +335,6 @@ if ($tab == 'build') {
 	}
 
 	if ($showBuildControls) {
-		// 'out' = real child-process output, 'err' = our own failure messages,
-		// 'info' = our own step/status lines. Stderr is not colored red just for
-		// being stderr; see CyphtPipeline::runProcess().
 		print '<style>
 #cyphtwebmail-log .log-out { color: #d4d4d4; }
 #cyphtwebmail-log .log-err { color: #f14c4c; }
@@ -359,7 +342,6 @@ if ($tab == 'build') {
 </style>';
 		$lastBuildLog = $manager->getLastBuildLog();
 
-		// Hidden if no build has ever run; setup.js un-hides it once one starts.
 		print '<div class="center" style="margin-top: 10px;">';
 		print '<button type="button" id="cyphtwebmail-log-toggle" class="button" data-show-text="'.$langs->trans("CyphtWebmailShowLog").'" data-hide-text="'.$langs->trans("CyphtWebmailHideLog").'" style="'.($lastBuildLog === '' ? 'display:none;' : '').'">'.$langs->trans("CyphtWebmailShowLog").'</button>';
 		print '</div>';
@@ -367,8 +349,6 @@ if ($tab == 'build') {
 		print '<pre id="cyphtwebmail-log" style="background:#1e1e1e; color:#d4d4d4; font-family:Consolas,\'Courier New\',monospace; font-size:12px; line-height:1.5; padding:12px 14px; max-height:500px; overflow:auto; border-radius:6px; border:1px solid #333; white-space:pre-wrap; word-break:break-all; margin-top:10px;"></pre>';
 		print '</div>';
 
-		// json_encode() escapes "/" to "\/", preventing a literal "</script>"
-		// in the log from closing this tag early.
 		print '<script type="application/json" id="cyphtwebmail-last-log">'.json_encode($lastBuildLog).'</script>';
 
 		print '<script src="'.dol_buildpath('/cyphtwebmail/js/admin/setup.js', 1).'"></script>';

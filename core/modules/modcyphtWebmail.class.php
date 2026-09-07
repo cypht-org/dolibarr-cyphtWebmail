@@ -78,7 +78,7 @@ class modcyphtWebmail extends DolibarrModules
 		$this->editor_url = '';		// Must be an external online web site
 		$this->editor_squarred_logo = '';					// Must be image filename into the module/img directory followed with @modulename. Example: 'myimage.png@cyphtWebmail'
 
-		/* Single source, cyphtwebmail_version.inc.php. The archive is named from it and build.json records it */
+		/* Version comes from cyphtwebmail_version.inc.php */
 		require_once __DIR__ . '/../../class/install/paths.class.php';
 		$cyphtModuleVersion = (new CyphtPaths())->getModuleVersion();
 		$this->version = ($cyphtModuleVersion !== '' ? $cyphtModuleVersion : 'development');
@@ -92,12 +92,8 @@ class modcyphtWebmail extends DolibarrModules
 		// If file is in theme/yourtheme/img directory under name object_pictovalue.png, use this->picto='pictovalue'
 		// If file is in module/img directory under name object_pictovalue.png, use this->picto='pictovalue@module'
 		// To use a supported fa-xxx css style of font awesome, use this->picto='xxx'
-		// Syntax is 'fa-<key>_<prefix>_<color>_<size>', parsed in img_picto()
-		// (core/lib/functions.lib.php). Deliberately not Dolibarr's built-in
-		// 'email' picto: modMailing, modEmailCollector and modNotification all
-		// already use that one, and two of them are linked from this module's
-		// own left menu, so sharing it would make three different things look
-		// identical. Green ties it to Cypht's own mark.
+		// Syntax is 'fa-<key>_<prefix>_<color>_<size>', see img_picto().
+		// Not the 'email' picto, which other mail modules in our menu already use.
 		$this->picto = 'fa-envelope-open-text_fas_#1d9e75';
 
 		// Define some features supported by module (triggers, login, substitutions, menus, css, etc...)
@@ -115,9 +111,7 @@ class modcyphtWebmail extends DolibarrModules
 		//	)
 		$this->module_parts = array(
 			// Set this to 1 if module has its own trigger directory (core/triggers)
-			// core/triggers/interface_99_modcyphtWebmail_CyphtWebmailTriggers
-			// deletes a user's Cypht settings file on USER_DELETE. Nothing
-			// else knows that file exists.
+			// Used to delete a user's Cypht settings file on USER_DELETE.
 			'triggers' => 1,
 			// Set this to 1 if module has its own login method file (core/login)
 			'login' => 0,
@@ -338,14 +332,14 @@ class modcyphtWebmail extends DolibarrModules
 		*/
 		/* END MODULEBUILDER PERMISSIONS */
 
-		// Paired with societe->lire; both are required.
+		// Also requires societe->lire.
 		$this->rights[$r][0] = $this->numero . '01';
 		$this->rights[$r][1] = 'SeeSenderRecordsInWebmail';
 		$this->rights[$r][4] = 'context';
 		$this->rights[$r][5] = 'read';
 		$r++;
 
-		// Paired with societe->creer; both are required.
+		// Also requires societe->creer.
 		$this->rights[$r][0] = $this->numero . '02';
 		$this->rights[$r][1] = 'CreateProspectFromWebmail';
 		$this->rights[$r][4] = 'context';
@@ -376,18 +370,11 @@ class modcyphtWebmail extends DolibarrModules
 		/* END MODULEBUILDER TOPMENU */
 
 		/* BEGIN LEFTMENU CYPHTWEBMAIL */
-		// Carries only what Cypht cannot: Dolibarr work queues, the mail
-		// automation Dolibarr owns, and module setup. Cypht's own sidebar
-		// already covers mail, contacts, servers and filters.
-		//
-		// 'fk_mainmenu=cyphtwebmail' must match the lower case 'mainmenu'
-		// value on the top entry, or the entries never appear.
+		// Only Dolibarr links here. Mail, contacts and filters are in Cypht's sidebar.
+		// 'fk_mainmenu=cyphtwebmail' must match the top entry's 'mainmenu' (lower case).
 
 		// --- Back to the mail client -------------------------------------
-		// Every other entry in this column navigates away from the webmail
-		// page, and the only route back would otherwise be the top menu. This
-		// is not a duplicate of Cypht's own sidebar: Cypht has no way to
-		// return you to the Dolibarr page that embeds it.
+		// The other entries leave the webmail page, so this one brings you back.
 		$this->menu[$r++] = array(
 			'fk_menu' => 'fk_mainmenu=cyphtwebmail',
 			'type' => 'left',
@@ -425,12 +412,11 @@ class modcyphtWebmail extends DolibarrModules
 			'titre' => 'CyphtMenuOverdueInvoices',
 			'mainmenu' => 'cyphtwebmail',
 			'leftmenu' => 'cyphtwebmail_invoices',
-			// search_option=late is read at compta/facture/list.php:201 and
-			// forces search_status to unpaid; same pair core's own menu uses.
+			// Same filter as Dolibarr's own "late invoices" menu.
 			'url' => '/compta/facture/list.php?search_option=late&search_status=1',
 			'langs' => 'cyphtwebmail@cyphtwebmail',
 			'position' => 1000 + $r,
-			// The module key is 'invoice'; the permission is still 'facture'.
+			// Module is 'invoice' but the permission is 'facture'.
 			'enabled' => "isModEnabled('invoice')",
 			'perms' => '$user->hasRight("facture", "lire")',
 			'target' => '',
@@ -451,7 +437,7 @@ class modcyphtWebmail extends DolibarrModules
 			'user' => 2,
 		);
 
-		// --- Mail automation Dolibarr owns -------------------------------
+		// --- Dolibarr mail tools ----------------------------------------
 		$this->menu[$r++] = array(
 			'fk_menu' => 'fk_mainmenu=cyphtwebmail',
 			'type' => 'left',
@@ -462,7 +448,7 @@ class modcyphtWebmail extends DolibarrModules
 			'langs' => 'cyphtwebmail@cyphtwebmail',
 			'position' => 1000 + $r,
 			'enabled' => "isModEnabled('emailcollector')",
-			// EmailCollector declares no rights of its own: it is a setup area.
+			// EmailCollector has no permissions of its own, admin only.
 			'perms' => '$user->admin',
 			'target' => '',
 			'user' => 0,
@@ -652,16 +638,8 @@ class modcyphtWebmail extends DolibarrModules
 			return -1; // Do not activate module if error 'not allowed' returned when loading module SQL queries (the _load_table run sql with run_sql with the error allowed parameter set to 'default')
 		}
 
-		/* Everything this installation needs that a shipped build cannot
-		 * carry. It used to be produced as a side effect of building on the
-		 * target machine; a prebuilt module never builds here, so activation
-		 * has to do it instead.
-		 *
-		 * Nothing is written to the module directory. The secrets go to
-		 * llx_const and the data directories live under DOL_DATA_ROOT, which
-		 * is outside the web root and writable by the webserver. That is the
-		 * whole point: an installed module should never need write access to
-		 * its own folder. */
+		/* Create the secrets and data directories for this install. Nothing
+		 * is written to the module directory. */
 		if ($this->runUpgrade() < 0) {
 			return -1;
 		}
@@ -730,12 +708,7 @@ class modcyphtWebmail extends DolibarrModules
 	}
 
 	/**
-	 * Bring this installation up to the schema the code expects.
-	 *
-	 * Activation and upgrade share one path. CyphtUpgrade is idempotent, so
-	 * enabling an already provisioned installation returns the existing
-	 * secrets rather than minting new ones, which matters because
-	 * USER_CONFIG_SECRET decrypts every stored mailbox password.
+	 * Run the database upgrade. Existing secrets are kept.
 	 *
 	 * @return int<-1,1> 1 on success, -1 on failure
 	 */
