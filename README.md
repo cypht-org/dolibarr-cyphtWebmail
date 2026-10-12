@@ -8,7 +8,7 @@ as an address book, and mail accounts stored in Dolibarr's own database.
 - Cypht docs: <https://cypht.org>
 - Dolibarr: <https://www.dolibarr.org>
 
-Cypht is LGPL-2.1, Dolibarr is GPL-3.0. This module is GPL-3.0.
+Cypht is LGPL-2.1, Dolibarr is GPL-3.0. This module is LGPL-2.1.
 
 ## Table of contents
 
@@ -21,7 +21,7 @@ Cypht is LGPL-2.1, Dolibarr is GPL-3.0. This module is GPL-3.0.
 - [Configuration reference](#configuration-reference)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
-- [Licence](#licence)
+- [License](#license)
 
 ## What it does
 
@@ -227,6 +227,10 @@ conventions, and the checklist to run before opening a PR.
 
 ## License
 
-This module is free software under the GNU General Public License, either
-version 3 or, at your option, any later version. The full text is in
-[LICENSE](LICENSE).
+This module is free software under the GNU Lesser General Public License,
+version 2.1 or, at your option, any later version, the same license as Cypht.
+The full text is in [LICENSE](LICENSE).
+
+The module descriptor, `core/modules/modcyphtWebmail.class.php`, is based on
+Dolibarr's module template and stays under the GNU General Public License,
+version 3 or later.
