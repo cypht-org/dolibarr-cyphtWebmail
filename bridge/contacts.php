@@ -17,11 +17,14 @@
 
 /**
  * \file        bridge/contacts.php
+ * \brief       Returns the contacts the user can see, as JSON.
  */
 
-// This is a machine-to-machine JSON endpoint: no session, no menus, no
-if (!defined('NOLOGIN')) {
-	define('NOLOGIN', '1');
+// Token auth for server-to-server calls
+if (!empty($_GET['token']) || !empty($_POST['token'])) {
+	if (!defined('NOLOGIN')) {
+		define('NOLOGIN', '1');
+	}
 }
 if (!defined('NOCSRFCHECK')) {
 	define('NOCSRFCHECK', '1');
@@ -45,7 +48,7 @@ if (!defined('NOBROWSERNOTIF')) {
 	define('NOBROWSERNOTIF', '1');
 }
 
-// Load Dolibarr environment (module lives at htdocs/custom/cyphtWebmail/bridge).
+// Load Dolibarr environment
 $res = 0;
 if (!$res && !empty($_SERVER["CONTEXT_DOCUMENT_ROOT"])) {
 	$res = @include $_SERVER["CONTEXT_DOCUMENT_ROOT"]."/main.inc.php";
@@ -64,8 +67,8 @@ if (!$res) {
 }
 
 /**
- * Emit a JSON response and stop.
-*
+ * Send a JSON response and exit.
+ *
  * @param int   $status HTTP status code
  * @param array $body   Payload to encode
  * @return void
@@ -76,7 +79,6 @@ function cyphtBridgeRespond($status, $body)
 
 	http_response_code($status);
 	header('Content-Type: application/json; charset=utf-8');
-	// Nothing here is cacheable: it is per-user data behind a 60s token.
 	header('Cache-Control: no-store, no-cache, must-revalidate');
 	header('X-Content-Type-Options: nosniff');
 	print json_encode($body);
@@ -93,60 +95,34 @@ if (!isModEnabled('cyphtwebmail')) {
 	cyphtBridgeRespond(403, array('error' => 'Module not enabled'));
 }
 
-// 'aZ09arobase' (a-z0-9_-.@) covers every character a Dolibarr login may
 $login = GETPOST('login', 'aZ09arobase');
 $token = GETPOST('token', 'aZ09');
 $search = GETPOST('search', 'alphanohtml');
 $limit = GETPOSTINT('limit');
 
-if ($login === '' || $token === '') {
-	cyphtBridgeRespond(400, array('error' => 'Missing login or token'));
-}
 
 // ---------------------------------------------------------------------
 
-// Read the constant directly rather than going through
-require_once __DIR__.'/../class/install/config.class.php';
-// Not llx_const: dolibarr_set_const() encrypts anything whose name ends
-// in _SECRET, and the webmail reads its copy over raw PDO before
-// Dolibarr is loaded, so the two ends would sign with different values.
-$secret = CyphtConfig::get($db, 'SSO_SHARED_SECRET', '');
-if ($secret === '') {
-	cyphtBridgeRespond(503, array('error' => 'SSO secret not initialised, run the module build first'));
+require_once __DIR__.'/../class/integration/bridgeauth.class.php';
+
+if ($token === '') {
+	/* Session cookie */
+	global $user;
+	if (empty($user->id)) {
+		cyphtBridgeRespond(403, array('error' => 'Not signed in'));
+	}
+	$bridgeUser = $user;
+} else {
+	$authStatus = 403;
+	$authError = '';
+	$bridgeUser = CyphtBridgeAuth::userFromToken($db, $login, $token, 'contacts', $authStatus, $authError);
+	if ($bridgeUser === null) {
+		cyphtBridgeRespond($authStatus, array('error' => $authError));
+	}
 }
 
-if (strpos($token, '.') === false) {
-	cyphtBridgeRespond(403, array('error' => 'Malformed token'));
-}
-
-list($timestamp, $signature) = explode('.', $token, 2);
-if (!ctype_digit($timestamp)) {
-	cyphtBridgeRespond(403, array('error' => 'Malformed token'));
-}
-
-// Same 60s anti-replay window as Custom_Auth::check_credentials().
-if (abs(time() - (int) $timestamp) > 60) {
-	cyphtBridgeRespond(403, array('error' => 'Token expired'));
-}
-
-$expected = hash_hmac('sha256', $login.'|'.$timestamp.'|contacts', $secret);
-if (!hash_equals($expected, $signature)) {
-	cyphtBridgeRespond(403, array('error' => 'Bad signature'));
-}
-
-// ---------------------------------------------------------------------
-
-$bridgeUser = new User($db);
-if ($bridgeUser->fetch(0, $login) <= 0) {
-	cyphtBridgeRespond(403, array('error' => 'Unknown user'));
-}
-if (isset($bridgeUser->statut) && $bridgeUser->statut == 0) {
-	cyphtBridgeRespond(403, array('error' => 'Disabled user'));
-}
 $bridgeUser->loadRights();
 
-// NOLOGIN leaves $conf->entity at its default; realign it with the user so
-// getEntity() below filters correctly under Multicompany.
 $conf->entity = ($bridgeUser->entity > 0 ? $bridgeUser->entity : 1);
 
 if (!$bridgeUser->hasRight('societe', 'lire')) {
@@ -155,223 +131,12 @@ if (!$bridgeUser->hasRight('societe', 'lire')) {
 
 // ---------------------------------------------------------------------
 
-$maxRows = getDolGlobalInt('CYPHTWEBMAIL_CONTACTS_MAX', 2000);
-if ($limit > 0 && $limit < $maxRows) {
-	$maxRows = $limit;
+require_once __DIR__.'/../class/integration/contactcollector.class.php';
+
+$collectError = '';
+$result = CyphtContactCollector::collect($db, $bridgeUser, $limit, $search, $collectError);
+if ($result === null) {
+	cyphtBridgeRespond(500, array('error' => $collectError));
 }
 
-$searchSql = '';
-if ($search !== '') {
-	$like = "'%".$db->escape($db->escapeforlike($search))."%'";
-	$searchSql = $like; // reused per query below with the right column set
-}
-
-$contacts = array();
-
-/**
- * Shape a row the way Hm_Contact expects. Extra Dolibarr-specific data goes
-*
- * @param string $email   Email address
- * @param string $name    Display name
- * @param string $group   Grouping label shown on the contacts page
- * @param array  $extra   Dolibarr-specific fields
- * @return array
- */
-function cyphtBridgeContact($email, $name, $group, $extra)
-{
-	// Ids must be derived, not generated: Hm_Repository::add() falls back to
-	// uniqid() when one is missing, so the send-to link on the contacts page
-	// points at an id the next request no longer has and compose opens empty.
-	if (isset($extra['dol_type'], $extra['dol_id'])) {
-		$id = 'dolibarr-'.$extra['dol_type'].'-'.$extra['dol_id'];
-	} else {
-		$id = 'dolibarr-'.md5(strtolower($email));
-	}
-
-	return array(
-		'id'            => $id,
-		'email_address' => $email,
-		'display_name'  => ($name !== '' ? $name : $email),
-		'group'         => $group,
-		'source'        => 'dolibarr',
-		'type'          => 'dolibarr',
-		'external'      => true,
-		'phone_number'  => isset($extra['phone']) ? $extra['phone'] : '',
-		// Top level, not just inside all_fields: Cypht's
-		'company'       => isset($extra['dol_company']) ? $extra['dol_company'] : '',
-		'all_fields'    => $extra,
-	);
-}
-
-// --- 3a. Contacts (llx_socpeople) -----------------------------------
-$sql = "SELECT sp.rowid, sp.lastname, sp.firstname, sp.email, sp.phone as phone_pro, sp.phone_mobile,";
-$sql .= " sp.poste, sp.fk_soc, s.nom as company";
-$sql .= " FROM ".MAIN_DB_PREFIX."socpeople as sp";
-$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."societe as s ON s.rowid = sp.fk_soc";
-// 'contact', not 'socpeople': that is the element token core itself passes
-$sql .= " WHERE sp.entity IN (".getEntity('contact').")";
-$sql .= " AND sp.email IS NOT NULL AND sp.email <> ''";
-$sql .= " AND sp.statut = 1";
-if ($searchSql !== '') {
-	$sql .= " AND (sp.email LIKE ".$searchSql." OR sp.lastname LIKE ".$searchSql;
-	$sql .= " OR sp.firstname LIKE ".$searchSql." OR s.nom LIKE ".$searchSql.")";
-}
-$sql .= " ORDER BY sp.lastname, sp.firstname";
-$sql .= $db->plimit($maxRows, 0);
-
-$resql = $db->query($sql);
-if (!$resql) {
-	cyphtBridgeRespond(500, array('error' => 'Contact query failed: '.$db->lasterror()));
-}
-while ($obj = $db->fetch_object($resql)) {
-	$name = trim($obj->firstname.' '.$obj->lastname);
-	$contacts[] = cyphtBridgeContact(
-		$obj->email,
-		$name,
-		($obj->company ? $obj->company : 'Dolibarr contacts'),
-		array(
-			'dol_type'    => 'contact',
-			'dol_id'      => (int) $obj->rowid,
-			'dol_socid'   => (int) $obj->fk_soc,
-			'dol_company' => (string) $obj->company,
-			'dol_job'     => (string) $obj->poste,
-			'phone'       => ($obj->phone_pro ? $obj->phone_pro : (string) $obj->phone_mobile),
-		)
-	);
-}
-$db->free($resql);
-
-// --- 3b. Third parties (llx_societe) --------------------------------
-$sql = "SELECT s.rowid, s.nom, s.email, s.phone";
-$sql .= " FROM ".MAIN_DB_PREFIX."societe as s";
-$sql .= " WHERE s.entity IN (".getEntity('societe').")";
-$sql .= " AND s.email IS NOT NULL AND s.email <> ''";
-$sql .= " AND s.status = 1";
-if ($searchSql !== '') {
-	$sql .= " AND (s.email LIKE ".$searchSql." OR s.nom LIKE ".$searchSql.")";
-}
-$sql .= " ORDER BY s.nom";
-$sql .= $db->plimit($maxRows, 0);
-
-$resql = $db->query($sql);
-if (!$resql) {
-	cyphtBridgeRespond(500, array('error' => 'Third party query failed: '.$db->lasterror()));
-}
-while ($obj = $db->fetch_object($resql)) {
-	$contacts[] = cyphtBridgeContact(
-		$obj->email,
-		(string) $obj->nom,
-		'Dolibarr third parties',
-		array(
-			'dol_type'    => 'thirdparty',
-			'dol_id'      => (int) $obj->rowid,
-			'dol_socid'   => (int) $obj->rowid,
-			'dol_company' => (string) $obj->nom,
-			'phone'       => (string) $obj->phone,
-		)
-	);
-}
-$db->free($resql);
-
-// --- 3c. Colleagues (llx_user) --------------------------------------
-// Only name, job and address: a staff directory, not the user record. Without
-// this there is no way to mail a colleague from the webmail, since the two
-// queries above cover customers and their contacts only.
-if (getDolGlobalString('CYPHTWEBMAIL_CONTACTS_INCLUDE_USERS', 'true') === 'true') {
-	$sql = "SELECT u.rowid, u.lastname, u.firstname, u.email, u.job";
-	$sql .= " FROM ".MAIN_DB_PREFIX."user as u";
-	// Same clause as Form::select_dolusers(), html.form.class.php:2753.
-	$sql .= " WHERE u.entity IN (".getEntity('user').")";
-	$sql .= " AND u.email IS NOT NULL AND u.email <> ''";
-	$sql .= " AND u.statut = 1";
-	if ($searchSql !== '') {
-		$sql .= " AND (u.email LIKE ".$searchSql." OR u.lastname LIKE ".$searchSql;
-		$sql .= " OR u.firstname LIKE ".$searchSql.")";
-	}
-	$sql .= " ORDER BY u.lastname, u.firstname";
-	$sql .= $db->plimit($maxRows, 0);
-
-	$resql = $db->query($sql);
-	if (!$resql) {
-		cyphtBridgeRespond(500, array('error' => 'User query failed: '.$db->lasterror()));
-	}
-	while ($obj = $db->fetch_object($resql)) {
-		$name = trim($obj->firstname.' '.$obj->lastname);
-		$contacts[] = cyphtBridgeContact(
-			$obj->email,
-			$name,
-			'Dolibarr users',
-			array(
-				'dol_type' => 'user',
-				'dol_id'   => (int) $obj->rowid,
-				'dol_job'  => (string) $obj->job,
-			)
-		);
-	}
-	$db->free($resql);
-}
-
-// --- 3d. Members (llx_adherent) -------------------------------------
-if (isModEnabled('member') && $bridgeUser->hasRight('adherent', 'lire')) {
-	$sql = "SELECT a.rowid, a.lastname, a.firstname, a.email, a.societe";
-	$sql .= " FROM ".MAIN_DB_PREFIX."adherent as a";
-	$sql .= " WHERE a.entity IN (".getEntity('adherent').")";
-	$sql .= " AND a.email IS NOT NULL AND a.email <> ''";
-	// Adherent::STATUS_VALIDATED, adherent.class.php:411.
-	$sql .= " AND a.statut = 1";
-	if ($searchSql !== '') {
-		$sql .= " AND (a.email LIKE ".$searchSql." OR a.lastname LIKE ".$searchSql;
-		$sql .= " OR a.firstname LIKE ".$searchSql." OR a.societe LIKE ".$searchSql.")";
-	}
-	$sql .= " ORDER BY a.lastname, a.firstname";
-	$sql .= $db->plimit($maxRows, 0);
-
-	$resql = $db->query($sql);
-	if (!$resql) {
-		cyphtBridgeRespond(500, array('error' => 'Member query failed: '.$db->lasterror()));
-	}
-	while ($obj = $db->fetch_object($resql)) {
-		$name = trim($obj->firstname.' '.$obj->lastname);
-		$contacts[] = cyphtBridgeContact(
-			$obj->email,
-			$name,
-			'Dolibarr members',
-			array(
-				'dol_type'    => 'member',
-				'dol_id'      => (int) $obj->rowid,
-				'dol_company' => (string) $obj->societe,
-			)
-		);
-	}
-	$db->free($resql);
-}
-
-// De-duplicate on address: a contact record wins over the company generic
-// address, because it was added first and carries a real person's name.
-$seen = array();
-$unique = array();
-foreach ($contacts as $contact) {
-	$key = strtolower($contact['email_address']);
-	if (isset($seen[$key])) {
-		continue;
-	}
-	$seen[$key] = true;
-	$unique[] = $contact;
-}
-
-// Each source is capped at $maxRows independently, so the ceiling is the cap
-// times however many actually ran.
-$sourcesQueried = 2;
-if (getDolGlobalString('CYPHTWEBMAIL_CONTACTS_INCLUDE_USERS', 'true') === 'true') {
-	$sourcesQueried++;
-}
-if (isModEnabled('member') && $bridgeUser->hasRight('adherent', 'lire')) {
-	$sourcesQueried++;
-}
-
-cyphtBridgeRespond(200, array(
-	'contacts' => $unique,
-	'count'    => count($unique),
-	'entity'   => (int) $conf->entity,
-	'truncated' => (count($contacts) >= ($maxRows * $sourcesQueried)),
-));
+cyphtBridgeRespond(200, $result);

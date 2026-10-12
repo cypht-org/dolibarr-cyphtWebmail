@@ -22,27 +22,17 @@ require_once __DIR__ . '/../auth/token.class.php';
 /**
  * \file        class/install/upgrade.class.php
  * \ingroup     cyphtwebmail
- * \brief       Bring an installation up to the schema the code expects.
- *
- *              DolibarrModules has no upgrade hook, so replacing the files
- *              runs new code against the old database with nothing called.
- *              This compares a stored version against SCHEMA_VERSION and is
- *              its own trigger. Activation calls it too, so install and
- *              upgrade share one path.
+ * \brief       Upgrades the database to the current SCHEMA_VERSION.
  */
 class CyphtUpgrade
 {
 	/**
-	 * Bump when a migration file is added, or when provision() gains
-	 * something an existing installation would otherwise miss.
-	 *
-	 * 1: config table, secrets and site id moved out of llx_const.
-	 * 2: cypht_version recorded on each stored user config.
+	 * Increase when adding a migration file or something to provision().
 	 */
 	const SCHEMA_VERSION = 2;
 
 	/**
-	 * @var string Last failure.
+	 * @var string Last error message
 	 */
 	public $error = '';
 
@@ -60,10 +50,9 @@ class CyphtUpgrade
 	}
 
 	/**
-	 * Fast path is one indexed read, so this is cheap enough to sit on a page
-	 * load.
+	 * Run pending migrations. Cheap when up to date (one query).
 	 *
-	 * @param bool $force Run even when the versions agree, used by activation
+	 * @param bool $force Run even if up to date (used on activation)
 	 * @return bool
 	 */
 	public function run($force = false)
@@ -75,7 +64,6 @@ class CyphtUpgrade
 		}
 
 		if ($stored > self::SCHEMA_VERSION) {
-			/* Migrations are forward only, so there is nothing safe to run. */
 			$this->error = 'This installation is at schema version ' . $stored
 				. ' but the installed code expects ' . self::SCHEMA_VERSION
 				. '. The module files appear to be older than the database.';
@@ -97,10 +85,8 @@ class CyphtUpgrade
 	}
 
 	/**
-	 * Apply sql/migrations/NNN_*.sql in order, skipping any already recorded.
-	 *
-	 * run_sql() rather than hand written queries: it rewrites the llx_ prefix
-	 * to whatever this installation uses.
+	 * Run sql/migrations/NNN_*.sql in order, skipping those already applied.
+	 * run_sql() handles the table prefix.
 	 *
 	 * @param int $from Version already applied
 	 * @return bool
@@ -125,7 +111,6 @@ class CyphtUpgrade
 
 		foreach ($files as $file) {
 			if (!preg_match('/^0*([0-9]+)_/', basename($file), $m)) {
-				/* Refuse rather than guess an order. */
 				$this->error = 'Migration file is not numbered: ' . basename($file);
 				return false;
 			}
@@ -135,7 +120,7 @@ class CyphtUpgrade
 				continue;
 			}
 
-			// 'default' lets "already exists" pass, so re-running is harmless.
+			// 'default' ignores "already exists" errors, so it is safe to re-run.
 			$result = run_sql($file, 1, $conf->entity, 1, '', 'default');
 			if ($result <= 0) {
 				$this->error = 'Migration failed: ' . basename($file);
@@ -147,10 +132,8 @@ class CyphtUpgrade
 	}
 
 	/**
-	 * Create the per-installation state a shipped build cannot carry.
-	 *
-	 * Idempotent: every getOrCreate returns what already exists, which matters
-	 * most for USER_CONFIG_SECRET.
+	 * Create the secrets and data directory for this install.
+	 * Existing values are kept.
 	 *
 	 * @return bool
 	 */

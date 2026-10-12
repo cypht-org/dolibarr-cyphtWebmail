@@ -13,10 +13,6 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 --
--- Migration 002: record which Cypht version wrote each stored user config.
---
--- The config column is a JSON blob whose shape belongs to Cypht. Without
--- this there is no way to tell which rows predate a format change.
--- The column is nullable because we don't want to break existing rows
+-- Migration 002: cypht_version column on user configs.
 
 ALTER TABLE llx_cyphtwebmail_userconfig ADD COLUMN cypht_version varchar(32) NULL;

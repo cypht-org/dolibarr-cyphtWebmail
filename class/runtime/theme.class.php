@@ -18,8 +18,7 @@
 /**
  * \file        class/runtime/theme.class.php
  * \ingroup     cyphtWebmail
- * \brief       Picks the webmail theme that matches the surrounding page,
- *              which the webmail is embedded in.
+ * \brief       Picks the Cypht theme that matches Dolibarr's dark mode setting.
  */
 class CyphtTheme
 {
@@ -27,9 +26,8 @@ class CyphtTheme
 	const LIGHT = 'default';
 
 	/**
-	 * The theme to load unconditionally. 1 means always dark; 0 and 2 both
-	 * start light, because under 2 the dark half is layered on top only when
-	 * the browser asks for it, exactly as the surrounding page does it.
+	 * Base theme. 1 is always dark. 0 and 2 start light; with 2 the dark
+	 * stylesheet is added when the browser prefers dark mode.
 	 *
 	 * @param int $darkMode Value of THEME_DARKMODEENABLED
 	 * @return string Theme name
@@ -40,7 +38,7 @@ class CyphtTheme
 	}
 
 	/**
-	 * Whether the choice belongs to the browser rather than to the server.
+	 * Whether dark mode follows the browser setting.
 	 *
 	 * @param int $darkMode Value of THEME_DARKMODEENABLED
 	 * @return bool

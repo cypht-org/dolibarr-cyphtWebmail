@@ -20,14 +20,13 @@ require_once __DIR__ . '/../install/paths.class.php';
 /**
  * \file        class/install/upstreampatches.class.php
  * \ingroup     cyphtWebmail
- * \brief       Patches an upstream Cypht bug that surfaces once a module's
- *              functions.php gets require()'d twice in the same process,
- *              which performSsoLogin()'s "functional login" call does.
+ * \brief       Patches Cypht so modules/core/functions.php can be loaded twice
+ *              in one request, which happens during SSO login.
  */
 class CyphtUpstreamPatches
 {
 	/**
-	 * @var string  Last error message, if any call returned false/failure.
+	 * @var string  Last error message
 	 */
 	public $error = '';
 
@@ -45,18 +44,7 @@ class CyphtUpstreamPatches
 	}
 
 	/**
-	 * Most functions in modules/core/functions.php guard against being
-	 * require()'d twice with "if (!hm_exists('name')) { ... }", but a few
-	 * are missing that guard (as of Cypht 2.11.1). Harmless normally, but
-	 * performSsoLogin()'s "functional login" call does load modules twice
-	 * in one process, causing a fatal "Cannot redeclare ...()".
-	 *
-	 * Rather than hardcode that list, which could shift on a future Cypht
-	 * release, this scans the file with PHP's tokenizer and wraps every
-	 * unguarded top-level function, skipping anything already wrapped.
-	 *
-	 * Applied by the build process, not hand-edited in vendor/, so
-	 * "composer install" re-fetching this package never reverts it.
+	 * Add the missing hm_exists() guards in modules/core/functions.php.
 	 *
 	 * @return bool
 	 */
@@ -64,7 +52,7 @@ class CyphtUpstreamPatches
 	{
 		$path = $this->paths->getCyphtPath() . '/modules/core/functions.php';
 		if (!is_readable($path)) {
-			return true; // nothing to patch yet
+			return true;
 		}
 
 		$content = file_get_contents($path);
@@ -75,7 +63,7 @@ class CyphtUpstreamPatches
 
 		$patched = $this->wrapUnguardedTopLevelFunctions($content);
 		if ($patched === $content) {
-			return true; // nothing unguarded found (or already patched)
+			return true;
 		}
 
 		if (file_put_contents($path, $patched) === false) {
@@ -87,11 +75,9 @@ class CyphtUpstreamPatches
 	}
 
 	/**
-	 * Wraps every unguarded top-level "function name(...) { ... }" in
-	 * "if (!hm_exists('name')) { ... }". Skips anonymous closures and
-	 * anything nested inside a class body. Uses PHP's tokenizer instead
-	 * of brace-counting so boundaries are found correctly even with
-	 * braces inside strings/comments.
+	 * Wrap each unguarded top-level function in
+	 * "if (!hm_exists('name')) { ... }". Skips closures and class methods.
+	 * Uses the tokenizer so braces in strings and comments are ignored.
 	 *
 	 * @param string $content
 	 * @return string Patched content (identical to input if nothing to do)
@@ -101,7 +87,7 @@ class CyphtUpstreamPatches
 		$tokens = token_get_all($content);
 		$count = count($tokens);
 		$result = '';
-		$classDepth = null; // brace depth at which the current class body started, or null if not in one
+		$classDepth = null; // brace depth where the current class starts, null outside a class
 		$braceDepth = 0;
 		$i = 0;
 
@@ -114,12 +100,12 @@ class CyphtUpstreamPatches
 			} elseif ($text === '}') {
 				$braceDepth--;
 				if ($classDepth !== null && $braceDepth === $classDepth) {
-					$classDepth = null; // left the class body
+					$classDepth = null;
 				}
 			}
 
 			if (is_array($token) && $token[0] === T_CLASS) {
-				$classDepth = $braceDepth; // depth *before* the class's own "{" is seen
+				$classDepth = $braceDepth; // depth before the class's own "{"
 			}
 
 			if (is_array($token) && $token[0] === T_FUNCTION && $classDepth === null) {
@@ -130,7 +116,7 @@ class CyphtUpstreamPatches
 				$name = (isset($tokens[$j]) && is_array($tokens[$j]) && $tokens[$j][0] === T_STRING) ? $tokens[$j][1] : null;
 
 				if ($name !== null) {
-					// Find the end of this function (its own matching closing brace).
+					// Find the function's closing brace.
 					$k = $j;
 					$depth = 0;
 					$started = false;
@@ -158,8 +144,7 @@ class CyphtUpstreamPatches
 						? $funcSource
 						: "if (!hm_exists('{$name}')) {\n" . $funcSource . "}\n";
 
-					// Keep braceDepth consistent with however many '{'/'}' this
-					// function's own source actually contained.
+					// Account for the braces inside the function.
 					$braceDepth += (substr_count($funcSource, '{') - substr_count($funcSource, '}'));
 					$i = $k;
 					continue;

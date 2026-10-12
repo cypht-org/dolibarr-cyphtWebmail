@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Read-only sender context source backed by bridge/context.php in the Dolibarr
+ * Clients for bridge/context.php (read) and bridge/create.php (create).
  * @package modules
  * @subpackage dolibarr_context
  */
@@ -9,38 +9,38 @@
 if (!defined('DEBUG_MODE')) { die(); }
 
 /**
+ * Gets the Dolibarr records for a sender address.
  * @subpackage dolibarr_context/lib
  */
 class Hm_Dolibarr_Context {
 
     /**
-     *  @var string Endpoint URL, injected via .env at build time
+     *  @var string Bridge URL
      */
     private $url;
     /**
-     *  @var string Shared HMAC secret, same one the SSO login uses
+     *  @var string Shared HMAC secret (same as SSO)
      */
     private $secret;
     /**
-     *  @var int HTTP status of the last request, 0 before the first
+     *  @var int HTTP status of the last request
      */
     private $last_status = 0;
 
     public function __construct() {
-        /*  Hm_Environment::get() rather than the env() helper, for the same */
         $this->url = Hm_Environment::get('DOLIBARR_CONTEXT_URL', '');
         $this->secret = Hm_Environment::get('SSO_SHARED_SECRET', '');
     }
 
     /**
-     * @return bool true if this source has everything it needs to run
+     * @return bool true if the URL and secret are set
      */
     public function configured() {
         return $this->url !== '' && $this->secret !== '';
     }
 
     /**
-     * Seconds a fetched card stays good for. Short by design: an unpaid
+     * How long a result is cached, in seconds.
      * @return int
      */
     public function ttl() {
@@ -48,7 +48,7 @@ class Hm_Dolibarr_Context {
     }
 
     /**
-     * How many addresses to keep cached in the session at once. Reading down a
+     * Max number of addresses cached in the session.
      * @return int
      */
     public function cache_limit() {
@@ -57,7 +57,7 @@ class Hm_Dolibarr_Context {
     }
 
     /**
-     * Whether the last failure was the endpoint refusing this user rather than
+     * True if the last request was refused (403).
      * @return bool
      */
     public function forbidden() {
@@ -65,10 +65,10 @@ class Hm_Dolibarr_Context {
     }
 
     /**
-     * Fetch the Dolibarr card for one email address.
-     * @param string $login Dolibarr username, as put in the session by SSO
-     * @param string $email Address from the message's From header
-     * @return array|false Decoded payload, or false on any transport or
+     * Get the Dolibarr records for an email address.
+     * @param string $login Dolibarr login
+     * @param string $email Sender address
+     * @return array|false Data, or false on error
      */
     public function fetch($login, $email) {
         if (!$this->configured() || $email === '') {
@@ -76,7 +76,6 @@ class Hm_Dolibarr_Context {
         }
 
         $timestamp = time();
-        /*  The '|context' tag is what stops a contacts token being replayed */
         $signature = hash_hmac('sha256', $login.'|'.$timestamp.'|context', $this->secret);
 
         $url = $this->url.(strpos($this->url, '?') === false ? '?' : '&');
@@ -92,7 +91,6 @@ class Hm_Dolibarr_Context {
         }
 
         $data = json_decode($body, true);
-        /*  'match' is the one key every answer carries, including the answer */
         if (!is_array($data) || !array_key_exists('match', $data)) {
             Hm_Debug::add('dolibarr_context: unexpected response: '.substr($body, 0, 200));
             return false;
@@ -109,8 +107,8 @@ class Hm_Dolibarr_Context {
     }
 
     /**
-     * @param string $url Fully built, signed request URL
-     * @return string|false Response body, or false on transport failure
+     * @param string $url Signed request URL
+     * @return string|false Response body, or false on failure
      */
     private function request($url) {
         $timeout = (int) Hm_Environment::get('DOLIBARR_CONTEXT_TIMEOUT', 5);
@@ -120,10 +118,14 @@ class Hm_Dolibarr_Context {
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
             curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
-            /*  The token is short lived but still a bearer credential, so */
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
+            /* For sites with HTTP auth in front of Dolibarr. */
+            $proxyAuth = Hm_Environment::get('DOLIBARR_BRIDGE_HTTP_AUTH', '');
+            if ($proxyAuth !== '') {
+                curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+                curl_setopt($ch, CURLOPT_USERPWD, $proxyAuth);
+            }
             if (Hm_Environment::get('DOLIBARR_CONTEXT_INSECURE', 'false') === 'true') {
-                /*  For local XAMPP setups serving Dolibarr over a self-signed */
                 curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
                 curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
             }
@@ -141,11 +143,16 @@ class Hm_Dolibarr_Context {
             return $body;
         }
 
-        $context = stream_context_create(array('http' => array(
+        $streamOpts = array(
             'timeout' => $timeout,
             'follow_location' => 0,
             'ignore_errors' => true,
-        )));
+        );
+        $proxyAuth = Hm_Environment::get('DOLIBARR_BRIDGE_HTTP_AUTH', '');
+        if ($proxyAuth !== '') {
+            $streamOpts['header'] = 'Authorization: Basic '.base64_encode($proxyAuth)."\r\n";
+        }
+        $context = stream_context_create(array('http' => $streamOpts));
         $body = @file_get_contents($url, false, $context);
         if ($body === false) {
             Hm_Debug::add('dolibarr_context: request failed, no curl and file_get_contents returned false');
@@ -156,17 +163,17 @@ class Hm_Dolibarr_Context {
 }
 
 /**
- * Writes. Creates a Dolibarr prospect from an email address.
+ * Creates a Dolibarr prospect from an email address.
  * @subpackage dolibarr_context/lib
  */
 class Hm_Dolibarr_Context_Create {
 
     /**
-     *  @var string Endpoint URL, injected via .env at build time
+     *  @var string Bridge URL
      */
     private $url;
     /**
-     *  @var string Shared HMAC secret, same one the SSO login uses
+     *  @var string Shared HMAC secret (same as SSO)
      */
     private $secret;
 
@@ -176,18 +183,18 @@ class Hm_Dolibarr_Context_Create {
     }
 
     /**
-     * @return bool true if this source has everything it needs to run
+     * @return bool true if the URL and secret are set
      */
     public function configured() {
         return $this->url !== '' && $this->secret !== '';
     }
 
     /**
-     * Create a prospect for one address.
-     * @param string $login Dolibarr username, as put in the session by SSO
-     * @param string $email Address from the message's From header
-     * @param string $name  Display name from the same header, may be empty
-     * @return array|false Decoded payload, or false on transport failure
+     * Create a prospect for an address.
+     * @param string $login Dolibarr login
+     * @param string $email Sender address
+     * @param string $name  Sender name, can be empty
+     * @return array|false Response data, or false on failure
      */
     public function create($login, $email, $name) {
         if (!$this->configured() || $email === '') {
@@ -195,7 +202,6 @@ class Hm_Dolibarr_Context_Create {
         }
 
         $timestamp = time();
-        /*  '|create' rather than '|context': a token minted for the read */
         $signature = hash_hmac('sha256', $login.'|'.$timestamp.'|create', $this->secret);
 
         $fields = array(
@@ -220,15 +226,14 @@ class Hm_Dolibarr_Context_Create {
     }
 
     /**
-     * @param string $url    Endpoint URL, unsigned
-     * @param array  $fields Form fields, the token among them
-     * @return string|false Response body, or false on transport failure
+     * @param string $url    Endpoint URL
+     * @param array  $fields Form fields, including the token
+     * @return string|false Response body, or false on failure
      */
     private function post($url, $fields) {
         $timeout = (int) Hm_Environment::get('DOLIBARR_CONTEXT_TIMEOUT', 5);
 
         if (!function_exists('curl_init')) {
-            /*  No stream_context fallback here, unlike the read client. A write */
             Hm_Debug::add('dolibarr_context_create: curl is required to create records');
             return false;
         }
@@ -239,8 +244,13 @@ class Hm_Dolibarr_Context_Create {
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($fields));
         curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
-        /*  Never follow a redirect: it would repeat the POST, and the token */
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
+        /* For sites with HTTP auth in front of Dolibarr. */
+        $proxyAuth = Hm_Environment::get('DOLIBARR_BRIDGE_HTTP_AUTH', '');
+        if ($proxyAuth !== '') {
+            curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+            curl_setopt($ch, CURLOPT_USERPWD, $proxyAuth);
+        }
         if (Hm_Environment::get('DOLIBARR_CONTEXT_INSECURE', 'false') === 'true') {
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
             curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
@@ -256,7 +266,7 @@ class Hm_Dolibarr_Context_Create {
             return false;
         }
         if ($status !== 200) {
-            /*  Returned rather than swallowed: the body carries Dolibarr's own */
+            /* Still return the body, it contains Dolibarr's error message. */
             Hm_Debug::add('dolibarr_context_create: HTTP '.$status.' '.substr($body, 0, 200));
         }
         return $body;

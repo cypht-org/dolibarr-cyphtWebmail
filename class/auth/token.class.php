@@ -20,8 +20,7 @@ require_once __DIR__ . '/../install/paths.class.php';
 /**
  * \file        class/auth/token.class.php
  * \ingroup     cyphtWebmail
- * \brief       Shared secrets and the short-lived HMAC assertions that prove
- *              a request belongs to a given Dolibarr user.
+ * \brief       Shared secrets and short-lived HMAC login tokens.
  */
 require_once __DIR__ . '/../install/config.class.php';
 
@@ -33,7 +32,7 @@ class CyphtToken
 	public $db;
 
 	/**
-	 * @var string  Last error message, if any call returned false/failure.
+	 * @var string  Last error message
 	 */
 	public $error = '';
 
@@ -46,9 +45,8 @@ class CyphtToken
 	}
 
 	/**
-	 * Secret signing the short-lived SSO tokens (see generateSsoLoginToken()).
-	 * Persisted in llx_const and mirrored into Cypht's .env so
-	 * Custom_Auth::check_credentials() can verify against it.
+	 * Get the secret used to sign SSO login tokens, creating it if needed.
+	 * Cypht reads the same value to check the tokens.
 	 *
 	 * @return string
 	 */
@@ -61,8 +59,6 @@ class CyphtToken
 			return $secret;
 		}
 
-		// Not loaded by master.inc.php, so a first command line build would
-		// otherwise die here rather than minting the secret.
 		require_once DOL_DOCUMENT_ROOT . '/core/lib/admin.lib.php';
 
 		$secret = bin2hex(random_bytes(32));
@@ -72,12 +68,7 @@ class CyphtToken
 	}
 
 	/**
-	 * Filesystem path of a user's Cypht settings file.
-
-	 *
-	 * Separate from the SSO secret: that one authenticates short-lived login
-	 * assertions, this one protects data at rest. Server-held rather than
-	 * derived from the user, since under SSO there is no stable password.
+	 * Get the key used to encrypt stored user settings, creating it if needed.
 	 *
 	 * @return string
 	 */
@@ -87,10 +78,6 @@ class CyphtToken
 
 		$secret = CyphtConfig::get($this->db, 'USER_CONFIG_SECRET', '');
 		if ($secret !== '') {
-			/* Never re-mint: this encrypts every mailbox password in
-			 * llx_cyphtwebmail_userconfig, and replacing it fails silently
-			 * rather than loudly. Rotating it means re-encrypting every
-			 * stored config in the same transaction. */
 			return $secret;
 		}
 
@@ -103,11 +90,7 @@ class CyphtToken
 	}
 
 	/**
-	 * Per-installation SITE_ID.
-	 *
-	 * Cypht bakes this into the compiled entry point, so a shipped build would
-	 * share one value across every install. It feeds build_fingerprint() in
-	 * lib/crypt.php, so that is a shared input to request key derivation.
+	 * Get this installation's SITE_ID, creating it if needed.
 	 *
 	 * @return string
 	 */
@@ -127,9 +110,8 @@ class CyphtToken
 	}
 
 	/**
-	 * HMAC token proving "this is really the current Dolibarr user", passed
-	 * to Cypht's cypht_login() as the password. Never a real mailbox
-	 * credential. Valid for 60s to limit replay.
+	 * Create a login token for the Dolibarr user, passed to cypht_login()
+	 * as the password. Valid for 60 seconds.
 	 *
 	 * @param string $login Dolibarr username to embed in the token
 	 * @return string

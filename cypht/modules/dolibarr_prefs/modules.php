@@ -1,8 +1,7 @@
 <?php
 
 /**
- * Applies the preferences Dolibarr already holds for the user to their webmail
- * account, so the two halves of the application do not disagree.
+ * Applies the user's Dolibarr language and theme to Cypht.
  * @package modules
  * @subpackage dolibarr_prefs
  */
@@ -10,11 +9,7 @@
 if (!defined('DEBUG_MODE')) { die(); }
 
 /**
- * Set the interface language from the one Dolibarr resolved for this user.
- *
- * The value arrives in the environment rather than over HTTP: the SSO login
- * runs Cypht in-process inside Dolibarr, so there is no request to sign.
- * An empty value means the setup page left the choice to each user.
+ * Set the Cypht language from the user's Dolibarr language.
  *
  * @param object $user_config user configuration object
  * @param object $session user session object
@@ -30,7 +25,7 @@ function dolibarr_apply_language($user_config, $session, $request, $config, $use
         return;
     }
 
-    /* Reaches a filename below, so nothing but a language code gets through. */
+    /* Used in a file path below, so only accept a language code. */
     if (!preg_match('/^[A-Za-z]{2}(-[A-Za-z]{2,4})?$/', $lang)) {
         Hm_Debug::add(sprintf('Ignoring malformed DOLIBARR_USER_LANG "%s"', $lang));
         return;
@@ -45,8 +40,7 @@ function dolibarr_apply_language($user_config, $session, $request, $config, $use
 }
 
 /**
- * Set the theme to match the light or dark choice made for the surrounding
- * page, which this webmail is embedded in.
+ * Set the Cypht theme to match the Dolibarr light or dark setting.
  *
  * @param object $user_config user configuration object
  * @param object $session user session object
@@ -62,7 +56,7 @@ function dolibarr_apply_theme($user_config, $session, $request, $config, $user, 
         return;
     }
 
-    /* Reaches a directory name below, so nothing but a theme name gets through. */
+    /* Used in a directory path below, so only accept a theme name. */
     if (!preg_match('/^[A-Za-z0-9_-]{1,32}$/', $theme)) {
         Hm_Debug::add(sprintf('Ignoring malformed DOLIBARR_USER_THEME "%s"', $theme));
         return;
@@ -75,13 +69,12 @@ function dolibarr_apply_theme($user_config, $session, $request, $config, $user, 
 
     $user_config->set('theme_setting', $theme);
 
-    /* Read back on every page draw by Hm_Handler_dolibarr_theme_auto. */
     $user_config->set('dolibarr_theme_auto',
         trim((string) Hm_Environment::get('DOLIBARR_USER_THEME_AUTO', '')) === '1');
 }
 
 /**
- * Carry the "let the browser decide" flag from the stored config onto the page.
+ * Pass the "follow the browser theme" flag to the page.
  * @subpackage dolibarr_prefs/handler
  */
 class Hm_Handler_dolibarr_theme_auto extends Hm_Handler_Module {
@@ -92,7 +85,7 @@ class Hm_Handler_dolibarr_theme_auto extends Hm_Handler_Module {
 }
 
 /**
- * Layer the dark stylesheet on top, for the browser to apply or ignore.
+ * Add the dark stylesheet, used only when the browser prefers dark mode.
  * @subpackage dolibarr_prefs/output
  */
 class Hm_Output_dolibarr_theme_auto extends Hm_Output_Module {
@@ -109,5 +102,42 @@ class Hm_Output_dolibarr_theme_auto extends Hm_Output_Module {
 
         return '<link href="'.ASSETS_THEMES_ROOT.'modules/themes/assets/'.$theme.'/css/'.$theme.'.css?v='.CACHE_ID.'"'.
             ' media="(prefers-color-scheme: dark)" rel="stylesheet" type="text/css" />';
+    }
+}
+
+/**
+ * Pass the Dolibarr login of this session to the page.
+ *
+ * @subpackage dolibarr_prefs/handler
+ */
+class Hm_Handler_dolibarr_session_user extends Hm_Handler_Module {
+
+    public function process() {
+        $login = $this->session->get('username', '');
+        if ($login) {
+            $this->out('dolibarr_session_user', (string) $login);
+        }
+    }
+}
+
+/**
+ * Clear Cypht's browser storage when the Dolibarr user changes.
+ *
+ * @subpackage dolibarr_prefs/output
+ */
+class Hm_Output_dolibarr_session_user extends Hm_Output_Module {
+
+    protected function output() {
+        $login = $this->get('dolibarr_session_user', '');
+        if ($login === '') {
+            return '';
+        }
+
+        $json = json_encode($login, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+
+        return '<script>(function(){try{var u='.$json.',k="dolibarr_session_user";'.
+            'if(window.sessionStorage.getItem(k)!==u){window.sessionStorage.clear();'.
+            'try{window.localStorage.clear();}catch(e){}window.sessionStorage.setItem(k,u);}}'.
+            'catch(e){}})();</script>';
     }
 }

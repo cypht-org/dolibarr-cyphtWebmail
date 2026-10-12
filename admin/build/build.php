@@ -18,7 +18,7 @@
 /**
  * \file        admin/build/build.php
  * \ingroup     cyphtWebmail
- * \brief       Build page: runs Cypht's config_gen.php through CyphtWebmail.
+ * \brief       Runs the build and streams its output.
  */
 
 // Load Dolibarr environment
@@ -54,8 +54,7 @@ if (!$user->admin) {
 	exit;
 }
 
-// currentToken(), not newToken(): newToken() rotates the session token
-// as a side effect, which would break this check on every request.
+// currentToken(), because newToken() would generate a new token.
 if (GETPOST('token', 'alpha') !== currentToken()) {
 	http_response_code(403);
 	echo "Invalid token";
@@ -71,14 +70,13 @@ if (session_id()) {
     session_write_close();
 }
 
-// NDJSON, one {t,c} object per line, so the client can color output by type.
 $buildResult = $manager->runConfigGen(function ($chunk, $type) use ($manager) {
     echo json_encode(array('t' => $type, 'c' => $chunk))."\n";
     $manager->cyphtwebmail_flush_now();
 });
 
 if (!$buildResult['success']) {
-    http_response_code(500); // no-op once headers are sent, kept for correctness
+    http_response_code(500);
     echo json_encode(array(
         't' => 'err',
         'c' => "\n\n".$langs->trans("CyphtWebmailBuildFailed").": ".$buildResult['error'],

@@ -13,6 +13,4 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 
--- One row per key per entity, so writing is an upsert rather than an append
--- and the reader never has to choose between duplicates.
 ALTER TABLE llx_cyphtwebmail_config ADD UNIQUE INDEX uk_cyphtwebmail_config_name (entity, name);

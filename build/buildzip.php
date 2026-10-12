@@ -18,15 +18,7 @@
 /**
  * \file        build/buildzip.php
  * \ingroup     cyphtWebmail
- * \brief       Build a release archive: export, build, prune, zip, verify.
- *
- *              php build/buildzip.php [--version=X.Y.Z] [--out=DIR]
- *                                     [--allow-dirty] [--quiet]
- *
- *              Named and placed after Dolibarr's own
- *              htdocs/modulebuilder/template/build. It compiles Cypht through
- *              scripts/build.php rather than copying a glob of the working
- *              tree, which is the customisation that template invites.
+ * \brief       Builds a release zip: export, build, prune, zip, verify.
  */
 
 if (substr(php_sapi_name(), 0, 3) !== 'cli') {
@@ -34,14 +26,9 @@ if (substr(php_sapi_name(), 0, 3) !== 'cli') {
 	exit(1);
 }
 
-/* Forced on, because php.ini decides this otherwise and XAMPP's CLI one ships
- * display_errors off. A fatal then prints nothing at all and the script just
- * returns non-zero, which reads as "it did nothing" rather than "it broke". */
 error_reporting(E_ALL);
 ini_set('display_errors', 'stderr');
 
-/* The same hole from the other side: a fatal skips every line below it, so
- * without this the last thing printed is whatever step was in progress. */
 register_shutdown_function(function () {
 	$fatal = error_get_last();
 	if ($fatal !== null && ($fatal['type'] & (E_ERROR | E_PARSE | E_CORE_ERROR | E_COMPILE_ERROR))) {
@@ -51,9 +38,6 @@ register_shutdown_function(function () {
 
 $root = dirname(__DIR__);
 
-// dist/ inside the module, which .gitignore already covers. The parent
-// directory was the old default and put releases outside the project, where
-// nobody thought to look.
 $options = array('out' => $root.'/dist', 'version' => '', 'allow-dirty' => false, 'quiet' => false);
 
 foreach (array_slice($argv, 1) as $arg) {
@@ -140,15 +124,6 @@ function cyphtPkgRun(array $cmd, $cwd)
 {
 	$cmdline = implode(' ', array_map('escapeshellarg', $cmd));
 
-	/* Files, not pipes, for the same reason CyphtPipeline::runProcess() uses
-	 * them. Draining stdout to EOF before reading stderr deadlocks as soon as
-	 * the child fills the stderr buffer, roughly 64KB, and Composer writes most
-	 * of its output to stderr. The staged build is composer plus config_gen, so
-	 * it passes that in seconds and the whole job hangs with nothing produced.
-	 *
-	 * stdin is a pipe we close immediately: a subprocess that decides to prompt
-	 * should get EOF and fail, not wait forever for a terminal that is not
-	 * there. */
 	$outFile = tempnam(sys_get_temp_dir(), 'cyphtpkg-out');
 	$errFile = tempnam(sys_get_temp_dir(), 'cyphtpkg-err');
 
@@ -179,7 +154,7 @@ function cyphtPkgRun(array $cmd, $cwd)
 }
 
 /**
- * The module's directory name, derived the way Dolibarr derives it.
+ * Module directory name, found the same way Dolibarr does.
  *
  * @param string $moduleRoot Tree to inspect
  * @return string
@@ -201,10 +176,8 @@ function cyphtPkgModuleName($moduleRoot)
 }
 
 /**
- * Digits and dots only, because admin/modules.php:262 accepts the upload
- * against /^(module[a-zA-Z0-9]*_|theme_|).*\-([0-9][0-9\.]*)\.zip$/ and strips
- * that same pattern at :292 to find the directory inside the archive. A suffix
- * like 2.0-beta1 is refused at upload.
+ * Check the version is digits and dots only. Dolibarr's module upload
+ * (admin/modules.php) rejects anything else, e.g. 2.0-beta1.
  *
  * @param string $version
  * @return void
@@ -217,12 +190,7 @@ function cyphtPkgCheckVersion($version)
 }
 
 /**
- * Everything the runtime never reads, relative to the staged module root.
- *
- * The three asset packages are the bulk of it: config_gen compiles them into
- * public/site.css, public/site.js and the theme stylesheets, and the only code
- * that points a browser back at vendor/ is get_js_libs(), which runs solely
- * under DEBUG_MODE.
+ * Files to remove from the release, relative to the module root.
  *
  * @return string[]
  */
@@ -236,7 +204,6 @@ function cyphtPkgPruneList()
 		$cypht.'site',
 		$cypht.'site.js',
 		$cypht.'site.css',
-		$cypht.'third_party',
 		$cypht.'fonts',
 		$cypht.'tests',
 		$cypht.'docker',
@@ -252,11 +219,11 @@ function cyphtPkgPruneList()
 }
 
 /**
- * Read the zip back and refuse to ship one that is wrong.
+ * Check the zip contents.
  *
  * @param string $zipPath
- * @param string $dirName Expected archive root
- * @param array<string,string> $forbidden Substring => why it must not be there
+ * @param string $dirName Expected root folder in the zip
+ * @param array<string,string> $forbidden Substring => reason it's not allowed
  * @return string[] Problems found
  */
 function cyphtPkgVerify($zipPath, $dirName, array $forbidden)
@@ -273,6 +240,9 @@ function cyphtPkgVerify($zipPath, $dirName, array $forbidden)
 		$dirName.'/vendor/jason-munro/cypht/vendor/autoload.php' => 'the autoloader shim public/index.php requires',
 		$dirName.'/vendor/autoload.php' => 'the Composer autoloader',
 		$dirName.'/core/modules/modcyphtWebmail.class.php' => 'the module descriptor',
+		$dirName.'/vendor/jason-munro/cypht/modules/site/lib.php' => 'the site module set, which declares Custom_Auth',
+		$dirName.'/vendor/jason-munro/cypht/config/zz_dolibarr.php' => 'the config pinning auth_type and the module list',
+		$dirName.'/vendor/jason-munro/cypht/third_party/cash.min.js' => 'a rebuild input; without it site.js compiles with $ undefined',
 	);
 	foreach ($required as $entry => $what) {
 		if ($zip->locateName($entry) === false) {
@@ -358,9 +328,6 @@ $dirName = cyphtPkgModuleName($root);
 $work = rtrim(sys_get_temp_dir(), '/\\').'/'.$dirName.'-package-'.getmypid();
 $staging = $work.'/'.$dirName;
 
-/* Staged under the system temp directory on purpose: build.php walks up
- * looking for a Dolibarr, and finding one here would compile against a live
- * installation. Nothing above temp can be one. */
 if (is_dir($work)) {
 	$files->deleteRecursive($work);
 }
@@ -402,10 +369,6 @@ if ($version === '') {
 	cyphtPkgSay('version '.$version.", from --version\n", $options['quiet']);
 }
 
-// vendor/ is gitignored, so the export has none.
-/* Copied when this tree has one, which turns a download into a file copy.
- * When it does not, nothing happens here: scripts/build.php fetches its own
- * dependencies, and it is the only thing in the module that knows how. */
 if (is_dir($root.'/vendor/jason-munro/cypht')) {
 	cyphtPkgSay("copying vendor/ ...\n", $options['quiet']);
 	$files->copyRecursive($root.'/vendor', $staging.'/vendor');
@@ -473,9 +436,6 @@ if ($zip->open($zipPath, ZipArchive::CREATE) !== true) {
 $count = cyphtPkgAddDir($zip, $staging, $dirName);
 $zip->close();
 
-/* Read back rather than trust the write. The .env check is the one that
- * matters: the build writes only defaults now, and this makes sure a
- * regression there cannot quietly ship this machine's credentials. */
 $problems = cyphtPkgVerify($zipPath, $dirName, array(
 	'/vendor/twbs/' => 'a build-only asset package survived the prune',
 	'/vendor/thomaspark/' => 'a build-only asset package survived the prune',

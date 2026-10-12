@@ -18,9 +18,8 @@
 /**
  * \file        admin/build/build_cancel.php
  * \ingroup     cyphtWebmail
- * \brief       AJAX endpoint for the Cancel button. Runs as a separate
- *              request from the one running the build, so it just drops a
- *              flag file that the build's own polling loop checks.
+ * \brief       Cancel button endpoint. Creates a flag file that the running
+ *              build checks.
  */
 
 // Load Dolibarr environment
@@ -66,7 +65,6 @@ if (!$user->admin) {
 	exit;
 }
 
-// currentToken(), not newToken(): see build.php's token check.
 if (GETPOST('token', 'alpha') !== currentToken()) {
 	http_response_code(403);
 	echo json_encode(array('success' => false, 'message' => 'Invalid token'));

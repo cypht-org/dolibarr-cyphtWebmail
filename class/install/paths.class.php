@@ -18,14 +18,12 @@
 /**
  * \file        class/install/paths.class.php
  * \ingroup     cyphtWebmail
- * \brief       Path resolution and installed/built-version bookkeeping for
- *              the vendored Cypht app.
+ * \brief       Paths and version info for the module and the vendored Cypht.
  */
 class CyphtPaths
 {
 	/**
-	 * Absolute path to the module root (three levels up from this file:
-	 * class/state/X.php -> class/state -> class -> module root).
+	 * Absolute path to the module root.
 	 *
 	 * @return string
 	 */
@@ -35,7 +33,7 @@ class CyphtPaths
 	}
 
 	/**
-	 * Absolute path to the vendored Cypht application (composer package root).
+	 * Absolute path to the vendored Cypht package.
 	 *
 	 * @return string
 	 */
@@ -45,8 +43,7 @@ class CyphtPaths
 	}
 
 	/**
-	 * Absolute path to the directory config_gen.php publishes its production
-	 * site/ output to (inside the vendored Cypht package itself).
+	 * Where config_gen.php writes the built site/ (inside the Cypht package).
 	 *
 	 * @return string
 	 */
@@ -56,9 +53,7 @@ class CyphtPaths
 	}
 
 	/**
-	 * Absolute path to the module's own public/ directory, which is the
-	 * folder we copy the built Cypht site/ into so it sits somewhere the
-	 * webserver can serve directly (vendor/ should never be web-exposed).
+	 * The module's public/ directory, where the built site/ is copied.
 	 *
 	 * @return string
 	 */
@@ -68,19 +63,14 @@ class CyphtPaths
 	}
 
 	/**
-	 * Dolibarr-managed data directory for this module, outside the web root.
-	 * Ensures the users/ and attachments/ subfolders Cypht needs exist.
-	 *
-	 * Unlike getModuleRoot() and getCyphtPath(), this needs Dolibarr loaded.
-	 * scripts/build.php --prepare runs without it and must never reach here.
+	 * The module's data directory in Dolibarr's documents folder. Creates
+	 * the users/ and attachments/ subfolders.
 	 *
 	 * @return string
 	 */
 	public function getDataDir()
 	{
-		/* No Dolibarr means no managed data directory. Only the build lock
-		 * gets this far, and it is kept outside the module so it cannot end
-		 * up in a release archive. */
+		/* Offline build */
 		if (!defined('DOL_DATA_ROOT')) {
 			$dir = rtrim(sys_get_temp_dir(), '/\\') . '/cyphtwebmail-build';
 			if (!is_dir($dir)) {
@@ -100,11 +90,7 @@ class CyphtPaths
 	}
 
 	/**
-	 * What the build recorded about itself, or null when there is no record.
-	 *
-	 * A shipped release has no llx_const behind it, so CYPHTWEBMAIL_BUILT_VERSION
-	 * is empty on every prebuilt install and cannot answer "what is this".
-	 * build.json is written by the build itself and travels with it.
+	 * Read build.json, or null if missing.
 	 *
 	 * @return array<string,string>|null Keys: module_version, cypht_version, built_at
 	 */
@@ -121,7 +107,7 @@ class CyphtPaths
 	}
 
 	/**
-	 * The module's own version, from cyphtwebmail_version.inc.php.
+	 * Module version from cyphtwebmail_version.inc.php.
 	 *
 	 * @return string Empty when it cannot be read
 	 */
@@ -131,7 +117,7 @@ class CyphtPaths
 	}
 
 	/**
-	 * The same read against any module tree.
+	 * Read the module version from a given module directory.
 	 *
 	 * @param string $moduleRoot
 	 * @return string Empty when it cannot be read
@@ -148,7 +134,7 @@ class CyphtPaths
 	}
 
 	/**
-	 * Record what this tree contains, at the module root. 
+	 * Write build.json at the module root.
 	 *
 	 * @param string|null $cyphtVersion Defaults to what Composer reports
 	 * @return void
@@ -174,9 +160,7 @@ class CyphtPaths
 	}
 
 	/**
-	 * Read jason-munro/cypht's installed version straight from Composer's
-	 * own installed.json, so this always reflects whatever is actually on
-	 * disk (post composer update) rather than something we cached earlier.
+	 * Installed jason-munro/cypht version, from Composer's installed.json.
 	 *
 	 * @return string|null  Version string (e.g. "2.11.1") or null if unknown
 	 */
@@ -191,7 +175,7 @@ class CyphtPaths
 		if (!is_array($data)) {
 			return null;
 		}
-		// Composer 2 wraps the package list in a "packages" key; composer 1 was a flat array.
+		// Composer 2 uses a "packages" key, Composer 1 a flat array.
 		$packages = isset($data['packages']) ? $data['packages'] : $data;
 
 		foreach ($packages as $pkg) {
@@ -204,8 +188,7 @@ class CyphtPaths
 	}
 
 	/**
-	 * Version that was actually built last time the button was clicked
-	 * (stored in llx_const after a successful runConfigGen()).
+	 * Cypht version of the last successful build.
 	 *
 	 * @return string
 	 */
@@ -215,7 +198,7 @@ class CyphtPaths
 	}
 
 	/**
-	 * Timestamp of the last successful build, or empty string if never built.
+	 * Date of the last successful build, or empty if never built.
 	 *
 	 * @return string
 	 */
@@ -225,9 +208,7 @@ class CyphtPaths
 	}
 
 	/**
-	 * True if the vendored Cypht version on disk differs from the version
-	 * we last generated a config for (e.g. after "composer update" pulled
-	 * a newer jason-munro/cypht release into vendor/).
+	 * True if the installed Cypht version differs from the last built one.
 	 *
 	 * @return bool
 	 */
@@ -235,13 +216,13 @@ class CyphtPaths
 	{
 		$installed = $this->getInstalledVersion();
 		if ($installed === null) {
-			return false; // Cypht isn't even installed, nothing to rebuild
+			return false;
 		}
 		return ($installed !== $this->getBuiltVersion());
 	}
 
 	/**
-	 * True if a build has ever succeeded and its output was published.
+	 * True if a build has been published.
 	 *
 	 * @return bool
 	 */
@@ -250,11 +231,7 @@ class CyphtPaths
 		return file_exists($this->getPublicPath() . '/index.php');
 	}
 	/**
-	 * Filesystem path of a user's Cypht settings file.
-	 *
-	 * MUST match Custom_User_Config::get_path() in the generated
-	 * modules/site/lib.php: Cypht writes the file, Dolibarr deletes it. The
-	 * sha256 fragment stops "jean dupont" and "jean_dupont" colliding.
+	 * Path of a user's Cypht settings file. Must match Custom_User_Config::get_path().
 	 *
 	 * @param string $login Dolibarr login
 	 * @return string
@@ -269,8 +246,7 @@ class CyphtPaths
 	}
 
 	/**
-	 * Pre-collision-fix filename, still cleaned up on user deletion so an
-	 * upgrade does not strand an old file holding mailbox credentials.
+	 * Old settings file name, before the hash was added.
 	 *
 	 * @param string $login Dolibarr login
 	 * @return string

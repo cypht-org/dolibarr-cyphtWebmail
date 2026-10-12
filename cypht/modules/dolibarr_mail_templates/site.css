@@ -1,8 +1,4 @@
-/**
- * Compose screen template picker.
- *
- * Scoped to the picker so no other outline button on the site is affected.
- */
+/* Template picker button on the compose screen (only this button). */
 .dolibarr_mail_templates_picker .btn-outline-primary {
     --bs-btn-color: var(--bs-primary);
     --bs-btn-border-color: var(--bs-primary);

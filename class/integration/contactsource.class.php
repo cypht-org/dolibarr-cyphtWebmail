@@ -20,13 +20,8 @@ require_once __DIR__ . '/../install/paths.class.php';
 /**
  * \file        class/integration/contactsource.class.php
  * \ingroup     cyphtWebmail
- * \brief       Installs the "dolibarr_contacts" Cypht module set, which
- *              exposes Dolibarr third parties and contacts to Cypht as a
- *              read-only contact source.
- *
- *              Source lives in cypht/modules/dolibarr_contacts and is copied
- *              into vendor/jason-munro/cypht on every build, so a "composer
- *              update" cannot silently revert it.
+ * \brief       The "dolibarr_contacts" Cypht module set, which shows Dolibarr
+ *              contacts in Cypht (read only).
  */
 class CyphtContactSource
 {
@@ -36,7 +31,7 @@ class CyphtContactSource
 	public $db;
 
 	/**
-	 * @var string  Last error message, if any call returned false/failure.
+	 * @var string  Last error message
 	 */
 	public $error = '';
 
@@ -46,8 +41,7 @@ class CyphtContactSource
 	private $paths;
 
 	/**
-	 * Module set name. Must also appear in CyphtEnvironment's CYPHT_MODULES
-	 * list, or config_gen.php never scans it.
+	 * Module set name. Must also be in CyphtEnvironment's CYPHT_MODULES list.
 	 */
 	const MODULE_NAME = 'dolibarr_contacts';
 
@@ -62,7 +56,7 @@ class CyphtContactSource
 	}
 
 	/**
-	 * Absolute URL of the contact feed the module set calls.
+	 * URL of the contacts bridge endpoint.
 	 *
 	 * @return string
 	 */
@@ -72,15 +66,12 @@ class CyphtContactSource
 	}
 
 	/**
-	 * Static form, so CyphtEnvironment can build the .env line without an
-	 * instance and without a $db handle it has no other use for.
+	 * Static version of getBridgeUrl().
 	 *
 	 * @return string
 	 */
 	public static function resolveBridgeUrl()
 	{
-		// Escape hatch for setups where Dolibarr's public URL is not
-		// reachable from the webserver back to itself.
 		$url = getDolGlobalString('CYPHTWEBMAIL_BRIDGE_URL', '');
 		if ($url !== '') {
 			return $url;

@@ -18,8 +18,8 @@
 /**
  * \file        scripts/bridge_probe.php
  * \ingroup     cyphtWebmail
- * \brief       Calls a bridge endpoint the way Cypht calls it, from the
- *              command line.
+ * \brief       Calls a bridge endpoint from the command line, like Cypht does.
+ *              For debugging.
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -28,7 +28,7 @@ if (PHP_SAPI !== 'cli') {
 }
 
 /**
- * Endpoints, each with the environment key holding its URL and the purpose tag
+ * Endpoints: env keys for the URL, timeout and insecure flag, and the token purpose tag.
  */
 $endpoints = array(
 	'contacts' => array(
@@ -75,7 +75,7 @@ function probeArgs($argv)
 }
 
 /**
- * One environment value, however CyphtEnvBootstrap happened to publish it.
+ * Read an environment value from $_ENV or getenv().
  * @param string $key Environment key
  * @return string Empty when unset
  */
@@ -110,7 +110,7 @@ if (!$ready) {
 	print "CyphtEnvBootstrap could not finish.\n\n";
 	print "  ".($bootstrap->error !== '' ? $bootstrap->error : 'No detail reported.')."\n\n";
 	print "Everything per installation, the shared secret included, is read\n";
-	print "from Dolibarr at request time rather than written into the built\n";
+	print "from Dolibarr at request time.\n";
 	print ".env. If this cannot reach conf.php or the database, neither can\n";
 	print "the webmail, and that is the fault to fix first.\n";
 	exit(1);
@@ -242,7 +242,6 @@ if ($status !== 200) {
 	exit(1);
 }
 
-// The interesting failures are 200s, so read the answer out.
 if ($name === 'context') {
 	if (empty($decoded['match'])) {
 		print "\nNo Dolibarr record owns that address. The panel will say so.\n";

@@ -23,13 +23,12 @@ require_once __DIR__ . '/../runtime/theme.class.php';
 /**
  * \file        class/auth/login.class.php
  * \ingroup     cyphtWebmail
- * \brief       Logs the current Dolibarr user into Cypht in-process, and
- *              tracks whether a live session already exists.
+ * \brief       Logs the Dolibarr user into Cypht (SSO).
  */
 class CyphtLogin
 {
 	/**
-	 * @var string  Last error message, if any call returned false/failure.
+	 * @var string  Last error message
 	 */
 	public $error = '';
 
@@ -54,22 +53,14 @@ class CyphtLogin
 	}
 
 	/**
-	 * Log the Dolibarr user into Cypht in-process via cypht_login(), which
-	 * sets the hm_id/hm_session cookies. Must run before any HTML output.
+	 * Log the Dolibarr user into Cypht with cypht_login(), which sets the
+	 * hm_id/hm_session cookies. Must run before any output.
 	 *
-	 * Skipped when hasLiveSsoSession() finds one: index.php calls this every
-	 * page load and cypht_login() resets the session data, which discarded
-	 * settings Cypht had not yet flagged for permanent storage.
-	 *
-	 * @param string $login Dolibarr username to log into Cypht as
-	 * @param string $cyphtUrl URL of the published Cypht app, need not be
-	 *                          absolute already, see absolutizeUrl()
-	 * @param string $userLang Language Dolibarr resolved for this user, e.g.
-	 *                          fr_FR. Preferences reach Cypht only through a
-	 *                          fresh login, so a live session whose preferences
-	 *                          no longer match is replaced rather than reused.
-	 * @return bool true if Cypht accepted the SSO token, or a live session
-	 *              already existed and was left alone
+	 * @param string $login Dolibarr login
+	 * @param string $cyphtUrl URL of the Cypht app (can be relative)
+	 * @param string $userLang Dolibarr language of the user, e.g. fr_FR. A
+	 *                          session with different preferences is replaced.
+	 * @return bool true if logged in or already logged in
 	 */
 	public function performSsoLogin($login, $cyphtUrl, $userLang = '')
 	{
@@ -93,6 +84,10 @@ class CyphtLogin
 
 		require_once $apiFile;
 
+		if (!$this->cyphtCanAuthenticate()) {
+			return false;
+		}
+
 		$token = $this->token->generateSsoLoginToken($login);
 
 		$ok = cypht_login($login, $token, $this->absolutizeUrl($cyphtUrl));
@@ -104,7 +99,7 @@ class CyphtLogin
 	}
 
 	/**
-	 * The interface language to apply, empty when each user keeps their own.
+	 * Language to apply, or empty if users choose their own.
 	 *
 	 * @param string $userLang Dolibarr language code
 	 * @return string
@@ -119,7 +114,7 @@ class CyphtLogin
 	}
 
 	/**
-	 * The theme to apply, empty when each user keeps their own.
+	 * Theme to apply, or empty if users choose their own.
 	 *
 	 * @return string
 	 */
@@ -133,8 +128,7 @@ class CyphtLogin
 	}
 
 	/**
-	 * '1' when the dark half should be left to the browser, as it is on the
-	 * surrounding page, and '' otherwise.
+	 * '1' if dark mode should follow the browser setting, '' otherwise.
 	 *
 	 * @return string
 	 */
@@ -148,8 +142,8 @@ class CyphtLogin
 	}
 
 	/**
-	 * Hand the preferences to the dolibarr_prefs module set, which reads them
-	 * while cypht_login() has the user config open.
+	 * Put the preferences in the environment for the dolibarr_prefs module
+	 * set to read during cypht_login().
 	 *
 	 * @param string $userLang Dolibarr language code
 	 * @return void
@@ -169,7 +163,7 @@ class CyphtLogin
 	}
 
 	/**
-	 * Short digest of the preferences a login would apply right now.
+	 * Short hash of the current preferences.
 	 *
 	 * @param string $userLang Dolibarr language code
 	 * @return string
@@ -183,8 +177,39 @@ class CyphtLogin
 	}
 
 	/**
-	 * Give the Cypht code loaded below the same configuration public/index.php
-	 * runs with.
+	 * Check what api_login/api.php needs before calling Custom_Auth, so we
+	 * get a clear error. Must run after api.php is loaded.
+	 *
+	 * @return bool
+	 */
+	private function cyphtCanAuthenticate()
+	{
+		if (!class_exists('Hm_Site_Config_File')) {
+			$this->error = 'The webmail loaded but its configuration classes did not; the build looks incomplete.';
+			return false;
+		}
+
+		$config = new Hm_Site_Config_File();
+		$modules = $config->get_modules();
+
+		if (!is_array($modules) || !in_array('site', $modules, true)) {
+			$this->error = 'The webmail module list resolved without "site", so its authentication class is never loaded. '
+				. 'config/app.php reads this through env(), which is getenv() only, so a correct .env on disk does not '
+				. 'guarantee it. Resolved ' . (is_array($modules) ? count($modules) . ' modules' : gettype($modules)) . '.';
+			return false;
+		}
+
+		$lib = $this->paths->getCyphtPath() . '/modules/site/lib.php';
+		if (!is_readable($lib)) {
+			$this->error = 'Cannot read ' . $lib . ', which declares the webmail authentication class.';
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Load the same configuration as public/index.php.
 	 *
 	 * @return bool
 	 */
@@ -213,8 +238,7 @@ class CyphtLogin
 	}
 
 	/**
-	 * Cookie recording which Dolibarr login the current Cypht session
-	 * belongs to, separate from Cypht's own hm_session/hm_id.
+	 * Name of the cookie that stores which Dolibarr login owns the Cypht session.
 	 *
 	 * @return string
 	 */
@@ -224,8 +248,7 @@ class CyphtLogin
 	}
 
 	/**
-	 * True when our login cookie matches, Cypht's hm_session cookie is set,
-	 * and the session file it names is still on disk.
+	 * Check that our cookie matches and the Cypht session file still exists.
 	 *
 	 * @param string $login
 	 * @param string $prefs Digest from preferenceFingerprint()
@@ -246,16 +269,14 @@ class CyphtLogin
 			return false;
 		}
 
-		// Mirrors Custom_Session::session_file()'s naming convention.
+		// Same naming as Custom_Session::session_file().
 		$sessionFile = $this->paths->getDataDir() . '/sso_sessions/' . $sessionKey . '.session';
 
 		return is_readable($sessionFile);
 	}
 
 	/**
-	 * Records which Dolibarr login the session cypht_login() just
-	 * established, for the next request's hasLiveSsoSession() check.
-	 * Session-lifetime cookie only; it authenticates nothing itself.
+	 * Save the login in a cookie for hasLiveSsoSession().
 	 *
 	 * @param string $login
 	 * @param string $prefs Digest from preferenceFingerprint()
@@ -273,8 +294,7 @@ class CyphtLogin
 	}
 
 	/**
-	 * cypht_login() needs an absolute URL for the cookie domain, and
-	 * dol_buildpath() can return a host-relative one.
+	 * Make the URL absolute. cypht_login() needs one for the cookie domain.
 	 *
 	 * @param string $url
 	 * @return string

@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Translations for the strings this module set renders.
+ * Translations for this module set.
  * @package modules
  * @subpackage dolibarr_context
  */
@@ -14,15 +14,15 @@ if (!defined('DEBUG_MODE')) { die(); }
 class Hm_Dolibarr_Context_Lang {
 
     /**
-     * @param string|false $lang Interface language code, as Cypht reports it
-     * @return array<string,string> Empty when the language is not carried here
+     * @param string|false $lang Cypht language code
+     * @return array<string,string> Empty if the language is not available
      */
     public static function get($lang) {
         if (!is_string($lang) || $lang === '') {
             return array();
         }
 
-        /*  'fr_FR' and the like reduce to the file Cypht would have used. */
+        /* 'fr_FR' becomes 'fr'. */
         $lang = strtolower(str_replace('-', '_', $lang));
         if (strpos($lang, '_') !== false) {
             $lang = substr($lang, 0, strpos($lang, '_'));

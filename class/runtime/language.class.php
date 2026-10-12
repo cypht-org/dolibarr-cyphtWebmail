@@ -18,13 +18,12 @@
 /**
  * \file        class/runtime/language.class.php
  * \ingroup     cyphtWebmail
- * \brief       Translates a Dolibarr language code into the one Cypht names
- *              its translation files with.
+ * \brief       Converts a Dolibarr language code to a Cypht one.
  */
 class CyphtLanguage
 {
 	/**
-	 * Codes where dropping the region gives the wrong answer. Dolibarr writes pt_BR, ....
+	 * Codes that need the region kept.
 	 *
 	 * @var array<string,string>
 	 */
@@ -35,10 +34,7 @@ class CyphtLanguage
 	);
 
 	/**
-	 * Dolibarr writes fr_FR, Cypht names its file fr.php. 
-	 *
-	 * Whether Cypht actually has the translation is checked on its own side,
-	 * where the language directory is.
+	 * Convert e.g. fr_FR to fr. Cypht checks that the translation exists.
 	 *
 	 * @param string $dolibarrLang Code such as fr_FR, or 'auto'
 	 * @return string Cypht language code, or '' when there is none

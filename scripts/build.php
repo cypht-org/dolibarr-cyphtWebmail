@@ -19,10 +19,7 @@
 /**
  * \file        scripts/build.php
  * \ingroup     cyphtWebmail
- * \brief       Command line build, in two modes.
- *
- *              prepare  Dependencies and module sets only. Run before zipping.
- *              build    Prepare, then compile and publish.
+ * \brief       Command line build.
  */
 
 if (substr(php_sapi_name(), 0, 3) !== 'cli') {
@@ -114,8 +111,7 @@ function cyphtSay($line, $quiet = false)
 }
 
 /**
- * Locate a Composer runnable across platforms: a local composer.phar first,
- * then whatever is on PATH under any of the names it ships as.
+ * Find Composer: composer.phar in the module root, then on PATH.
  *
  * @param string $root Module root
  * @return string[]|null Command prefix, or null if none found
@@ -146,10 +142,8 @@ function cyphtFindComposer($root)
 }
 
 /**
- * Resolve a user-supplied Dolibarr location to its master.inc.php.
- *
- * Accepts whichever of the three a person is likely to have to hand: the file
- * itself, the htdocs folder holding it, or the install root above that.
+ * Find master.inc.php from the --dolibarr path. Accepts the file itself,
+ * the htdocs folder or the install root.
  *
  * @param string $path
  * @return string|null Absolute path to master.inc.php, or null if not there
@@ -210,10 +204,6 @@ function cyphtRun(array $cmd, $cwd, $quiet)
 	return proc_close($proc);
 }
 
-/*
- * Checked before any work starts: a typo here should fail in a second, not
- * after composer and a full compile.
- */
 $masterIncPath = '';
 
 if ($options['dolibarr'] !== '') {
@@ -238,16 +228,9 @@ $vendorLayout = new CyphtVendorLayout($paths);
 $installer = new CyphtModuleInstaller($paths);
 $patches = new CyphtUpstreamPatches($paths);
 
-/*
- * Steps 1 and 2 belong to --prepare alone. A full build calls runConfigGen(),
- * whose own first step is composer, the module sets and the patches, so doing
- * them here as well ran the lot twice and reported finishing twice.
- */
 if ($options['mode'] === 'prepare') {
 	cyphtPrepare($root, $options, $vendorLayout, $installer, $patches);
 
-	// The tree this produces is what gets zipped, so it records itself here
-	// rather than shipping whatever the last build on this machine left behind.
 	$paths->writeBuildInfo();
 
 	cyphtSay("\nPrepared. Dependencies and module sets are in place.\n", $options['quiet']);
@@ -256,16 +239,11 @@ if ($options['mode'] === 'prepare') {
 }
 
 /**
- * Walk up from the module looking for a Dolibarr to load.
- *
- * Every ancestor is tried rather than two or three fixed depths: the module is
- * only conventionally at htdocs/custom/<name>, and is just as often symlinked
- * in, nested deeper, or kept outside the tree entirely. Each level is checked
- * for master.inc.php directly and for an htdocs/ holding one, which covers
- * both sitting inside the web root and sitting beside it.
+ * Look for Dolibarr's master.inc.php in each parent directory of the module
+ * (and in their htdocs/ folder).
  *
  * @param string $start Module root
- * @return string Path to master.inc.php, or '' when there is no Dolibarr above
+ * @return string Path to master.inc.php, or '' if not found
  */
 function cyphtFindDolibarr($start)
 {
@@ -278,7 +256,6 @@ function cyphtFindDolibarr($start)
 			}
 		}
 
-		// dirname() is its own parent at the filesystem root, on both platforms.
 		$parent = dirname($dir);
 		if ($parent === $dir) {
 			return '';
@@ -288,10 +265,7 @@ function cyphtFindDolibarr($start)
 }
 
 /**
- * Fetch dependencies and install this module's Cypht module sets.
- *
- * Touches only files, so it needs neither Dolibarr nor a database. Exits on
- * failure rather than returning: there is nothing useful to do afterwards.
+ * Install dependencies and our Cypht module sets. Exits on failure.
  *
  * @param string $root Module root
  * @param array<string,mixed> $options Parsed command line
@@ -313,8 +287,6 @@ function cyphtPrepare($root, array $options, $vendorLayout, $installer, $patches
 		cyphtSay("Composer not found; using the vendor/ already on disk.\n", $options['quiet']);
 	} else {
 		cyphtSay("== Dependencies ==\n", $options['quiet']);
-		// Composer reports progress on stderr, not stdout, so silencing our own
-		// output is not enough; it has to be told to be quiet itself.
 		$composerArgs = array('install', '--no-interaction', '--no-progress');
 		if ($options['quiet']) {
 			$composerArgs[] = '--quiet';
@@ -349,19 +321,10 @@ function cyphtPrepare($root, array $options, $vendorLayout, $installer, $patches
 	}
 }
 
-/* A build on a fresh clone has nothing under vendor/ yet, and the offline
- * branch below reads .env.example out of the Cypht package before compiling.
- * Conditional because runConfigGen() fetches dependencies itself, so on an
- * already-populated tree this would be the second composer run of the build. */
 if (!is_dir($root.'/vendor/jason-munro/cypht')) {
 	cyphtPrepare($root, $options, $vendorLayout, $installer, $patches);
 }
 
-/*
- * Step 3: the full build. Dolibarr is loaded from here on for the bookkeeping
- * it owns, the last build date and version in llx_const. The compile itself
- * needs none of it.
- */
 if ($masterIncPath === '') {
 	$masterIncPath = cyphtFindDolibarr($root);
 }
@@ -378,7 +341,11 @@ if ($masterIncPath === '') {
 		fwrite(STDERR, $envError."\n");
 		exit(1);
 	}
-	cyphtSay("wrote build defaults to vendor/jason-munro/cypht/.env\n", $options['quiet']);
+	if (!CyphtEnvironment::writeConfigTo($paths->getCyphtPath(), $envError)) {
+		fwrite(STDERR, $envError."\n");
+		exit(1);
+	}
+	cyphtSay("wrote build defaults to vendor/jason-munro/cypht/.env and config/zz_dolibarr.php\n", $options['quiet']);
 
 	$offline = new CyphtPipeline(null, $paths, null, $vendorLayout, null, $patches, $installer);
 
@@ -400,8 +367,6 @@ require_once $root.'/class/webmail.class.php';
 global $db, $conf;
 
 if (!isModEnabled('cyphtwebmail')) {
-	// A warning, not a failure: building before enabling the module is a
-	// reasonable order to do things in.
 	fwrite(STDERR, "warning: the cyphtWebmail module is not enabled yet in Dolibarr.\n");
 }
 
@@ -421,15 +386,8 @@ if (empty($result['success'])) {
 	exit(1);
 }
 
-/*
- * Step 4: permissions. A build run from a terminal creates files owned by
- * whoever ran it; if that is not the webserver user, the next request cannot
- * write sessions, settings or a new build, and it fails far from the cause.
- */
+/* Make sure the web server can write what the build created. */
 if ($options['permissions']) {
-	// Directories get created when absent; the .env is a file the build has
-	// already written, so a missing one means something failed earlier. Never
-	// mkdir it: a directory named .env breaks every build after this one.
 	$writableDirs = array(
 		$webmail->getPublicPath(),
 		$webmail->getDataDir(),

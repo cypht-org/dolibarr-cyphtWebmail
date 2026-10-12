@@ -20,13 +20,8 @@ require_once __DIR__ . '/../install/paths.class.php';
 /**
  * \file        class/integration/mailtemplatesource.class.php
  * \ingroup     cyphtWebmail
- * \brief       Installs the "dolibarr_mail_templates" Cypht module set, which puts
- *              Dolibarr's general purpose email templates on the compose
- *              screen.
- *
- *              Source lives in cypht/modules/dolibarr_mail_templates and is
- *              copied into vendor/jason-munro/cypht on every build, so a
- *              "composer update" cannot silently revert it.
+ * \brief       The "dolibarr_mail_templates" Cypht module set, which adds
+ *              Dolibarr email templates to the compose screen.
  */
 class CyphtMailTemplateSource
 {
@@ -36,7 +31,7 @@ class CyphtMailTemplateSource
 	public $db;
 
 	/**
-	 * @var string  Last error message, if any call returned false/failure.
+	 * @var string  Last error message
 	 */
 	public $error = '';
 
@@ -46,8 +41,7 @@ class CyphtMailTemplateSource
 	private $paths;
 
 	/**
-	 * Module set name. Must also appear in CyphtEnvironment's CYPHT_MODULES
-	 * list, or config_gen.php never scans it.
+	 * Module set name. Must also be in CyphtEnvironment's CYPHT_MODULES list.
 	 */
 	const MODULE_NAME = 'dolibarr_mail_templates';
 
@@ -62,7 +56,7 @@ class CyphtMailTemplateSource
 	}
 
 	/**
-	 * Absolute URL of the template feed the module set calls.
+	 * URL of the mail templates bridge endpoint.
 	 *
 	 * @return string
 	 */
@@ -72,17 +66,12 @@ class CyphtMailTemplateSource
 	}
 
 	/**
-	 * Static form, so CyphtEnvironment can build the .env line without an
-	 * instance and without a $db handle it has no other use for.
+	 * Static version of getBridgeUrl().
 	 *
 	 * @return string
 	 */
 	public static function resolveBridgeUrl()
 	{
-		// Escape hatch for setups where Dolibarr's public URL is not
-		// reachable from the webserver back to itself. Shared with the
-		// contacts bridge on purpose: one unreachable host means both are
-		// unreachable, so there is nothing to configure separately.
 		$url = getDolGlobalString('CYPHTWEBMAIL_BRIDGE_MAIL_TEMPLATES_URL', '');
 		if ($url !== '') {
 			return $url;

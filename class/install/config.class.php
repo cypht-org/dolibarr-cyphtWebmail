@@ -18,17 +18,13 @@
 /**
  * \file        class/install/config.class.php
  * \ingroup     cyphtwebmail
- * \brief       Read and write llx_cyphtwebmail_config from the Dolibarr side.
- *
- *              Not llx_const: dolibarr_set_const() encrypts anything ending
- *              in _SECRET or _KEY, so a reader that runs before Dolibarr gets
- *              ciphertext. CyphtEnvBootstrap reads this same table.
+ * \brief       Read and write llx_cyphtwebmail_config.
  */
 class CyphtConfig
 {
 	/**
 	 * @param DoliDB $db
-	 * @param string $name  Cypht side name, for example SSO_SHARED_SECRET
+	 * @param string $name  e.g. SSO_SHARED_SECRET
 	 * @param string $default
 	 * @param int|null $entity Defaults to the current entity
 	 * @return string
@@ -61,8 +57,7 @@ class CyphtConfig
 	}
 
 	/**
-	 * The unique index on (entity, name) is what makes the delete then
-	 * insert safe to repeat.
+	 * Save a value (delete then insert, in a transaction).
 	 *
 	 * @param DoliDB $db
 	 * @param string $name
@@ -100,15 +95,11 @@ class CyphtConfig
 	}
 
 	/**
-	 * Fetch or mint, never overwrite.
-	 *
-	 * There is deliberately no overwriting counterpart: rotating
-	 * USER_CONFIG_SECRET without re-encrypting every stored config empties
-	 * every mailbox account, silently.
+	 * Get a secret, creating it if missing.
 	 *
 	 * @param DoliDB $db
 	 * @param string $name
-	 * @param int $bytes Raw bytes of entropy, hex encoded on the way in
+	 * @param int $bytes Number of random bytes (stored as hex)
 	 * @return string
 	 */
 	public static function getOrCreateSecret($db, $name, $bytes = 32)

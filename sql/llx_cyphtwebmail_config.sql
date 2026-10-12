@@ -13,14 +13,7 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see https://www.gnu.org/licenses/.
 --
--- Installation scoped configuration for the webmail, one row per key.
---
--- Not llx_const: dolibarr_set_const() encrypts anything ending in _KEY,
--- _PASS or _SECRET and decrypts it for $conf->global. The webmail reads its
--- config over PDO before Dolibarr loads, so it would get ciphertext and every
--- signed bridge request would fail on signature.
---
--- Names are Cypht's own, so rows map straight into the environment.
+-- Webmail configuration, one row per key.
 
 
 CREATE TABLE llx_cyphtwebmail_config(

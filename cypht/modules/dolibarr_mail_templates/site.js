@@ -1,19 +1,7 @@
 'use strict';
 
 /**
- * Compose screen template picker.
- *
- * A single line under the message box opens a dialog built with core's
- * Hm_Modal, so the picker looks and behaves like every other overlay in Cypht
- * rather than being a panel this module invented.
- *
- * Nothing about a template is in the page when it loads. Opening the dialog
- * fetches an index of names; choosing a row fetches that one template into a
- * preview; only Insert writes to the draft, and that is undoable.
- *
- * This file is concatenated into the bundled site.js by config_gen.php, which
- * means it loads on every page. Every entry point therefore has to tolerate
- * the picker being absent.
+ * Template picker on the compose screen.
  */
 
 var dolibarr_mail_templates_state = {
@@ -64,7 +52,7 @@ var dolibarr_mail_templates_note = function(listEl, text) {
 };
 
 /**
- * Draw the index, grouped by type, filtered by the search term.
+ * Show the template list, grouped by type and filtered by the search.
  */
 var dolibarr_mail_templates_render = function(strings, term) {
     var nodes = dolibarr_mail_templates_nodes();
@@ -87,9 +75,6 @@ var dolibarr_mail_templates_render = function(strings, term) {
 
     nodes.list.innerHTML = '';
 
-    /* Group in one pass so each heading carries its own count and container.
-     * Type is a heading, not a gate: as a gate it hid the catalogue behind a
-     * guess at which type a template lived under. */
     var groups = [];
     var byType = {};
     shown.forEach(function(row) {
@@ -105,9 +90,6 @@ var dolibarr_mail_templates_render = function(strings, term) {
         head.type = 'button';
         head.className = 'btn btn-sm d-flex align-items-center gap-1 w-100 text-start px-2 py-1 fw-bold border-0';
         head.setAttribute('data-group', group.type);
-        /* Collapsed state is per group and starts open, so the catalogue is
-         * visible on arrival and folding away the noise is the user's choice
-         * rather than the default. */
         head.setAttribute('aria-expanded', 'true');
 
         var caret = document.createElement('i');
@@ -125,7 +107,6 @@ var dolibarr_mail_templates_render = function(strings, term) {
 
         nodes.list.appendChild(head);
 
-        /* Indented, so a row reads as belonging to the heading above it. */
         var items = document.createElement('div');
         items.className = 'ms-3';
         items.setAttribute('data-group-items', group.type);
@@ -139,9 +120,6 @@ var dolibarr_mail_templates_render = function(strings, term) {
             item.textContent = row.label;
 
             if (row.flagged) {
-                /* Info blue, not an amber triangle: placeholders are a
-                 * property of the template, not a fault. Matches the preview
-                 * note. */
                 var mark = document.createElement('i');
                 mark.className = 'bi bi-braces ms-1 text-primary';
                 mark.setAttribute('title', strings.flagged);
@@ -154,14 +132,11 @@ var dolibarr_mail_templates_render = function(strings, term) {
         nodes.list.appendChild(items);
     });
 
-    /* Redrawing wipes the highlight, so put it back on whatever is still
-     * selected and still visible. */
     dolibarr_mail_templates_highlight(dolibarr_mail_templates_state.selected_id);
 };
 
 /**
- * Mark one row as the chosen one. The preview alone does not say which row it
- * came from once the list has scrolled.
+ * Highlight the selected row.
  */
 var dolibarr_mail_templates_highlight = function(id) {
     var listEl = document.getElementById('dolibarr_mail_template_list');
@@ -196,15 +171,11 @@ var dolibarr_mail_templates_toggle_group = function(head) {
 };
 
 /**
- * List the markers that survived substitution.
+ * Show the placeholders left in the template, for the user to fill in.
  *
- * Not styled as a warning: leftover markers are the normal state for a
- * template written around an object compose does not have. Chips, not alert
- * text, so they read as blanks to fill.
- *
- * @param {HTMLElement} box     Container, emptied and rebuilt
- * @param {Object}      strings Translated strings from the trigger
- * @param {Array}       list    Placeholder markers, may be empty or absent
+ * @param {HTMLElement} box     Container (emptied first)
+ * @param {Object}      strings Translated strings
+ * @param {Array}       list    Placeholders, can be empty or missing
  */
 var dolibarr_mail_templates_placeholders = function(box, strings, list) {
     if (!box) {
@@ -228,7 +199,6 @@ var dolibarr_mail_templates_placeholders = function(box, strings, list) {
     list.forEach(function(marker) {
         var chip = document.createElement('span');
         chip.className = 'badge bg-light text-primary border border-primary fw-normal font-monospace';
-        /* textContent: a marker is template content, not markup. */
         chip.textContent = marker;
         chips.appendChild(chip);
     });
@@ -245,8 +215,6 @@ var dolibarr_mail_templates_show_preview = function(strings, template) {
     }
 
     nodes.previewSubject.textContent = template.subject;
-    /* Plain text, truncated: this is a glance to confirm the right template,
-     * not a rendering of the mail. */
     var plain = String(template.body).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
     nodes.previewBody.textContent = plain.length > 220 ? plain.slice(0, 220) + '…' : plain;
 
@@ -268,8 +236,8 @@ var dolibarr_mail_templates_hide_undo = function() {
 };
 
 /**
- * Write the selected template into the compose fields, remembering enough to
- * put them back.
+ * Insert the selected template into the compose fields, saving the old
+ * values for undo.
  */
 var dolibarr_mail_templates_insert = function(strings) {
     var template = dolibarr_mail_templates_state.selected;
@@ -285,14 +253,10 @@ var dolibarr_mail_templates_insert = function(strings) {
         body: body ? body.value : null
     };
 
-    /* The subject is only ever filled when empty. Overwriting a subject the
-     * user already typed loses work. */
     if (subject && subject.value === '') {
         subject.value = template.subject;
     }
 
-    /* Insert at the caret rather than replacing, so a template can be dropped
-     * in above an existing signature. */
     if (body) {
         var start = body.selectionStart || 0;
         var end = body.selectionEnd || 0;
@@ -308,17 +272,12 @@ var dolibarr_mail_templates_insert = function(strings) {
         body.focus();
     }
 
-    /* Inserting is the one destructive thing this picker does, and it lands in
-     * the middle of text the user may have written. Offer the way back. */
     if (nodes.undoBar) {
         nodes.undoText.textContent = strings.inserted;
         nodes.undoBar.hidden = false;
         if (dolibarr_mail_templates_state.undo_timer) {
             clearTimeout(dolibarr_mail_templates_state.undo_timer);
         }
-        /* Long enough to read the inserted text, decide it is the wrong
-         * template, and act. A shorter window expires while the user is still
-         * reading the thing they would want to undo. */
         dolibarr_mail_templates_state.undo_timer = setTimeout(function() {
             dolibarr_mail_templates_hide_undo();
         }, 30000);
@@ -360,7 +319,7 @@ var dolibarr_mail_templates_load_index = function(strings) {
             dolibarr_mail_templates_state.loading = false;
             var listEl = document.getElementById('dolibarr_mail_template_list');
             if (!listEl) {
-                return; /* dialog closed while the request was in flight */
+                return;
             }
             if (!res.dolibarr_mail_template_list) {
                 dolibarr_mail_templates_note(listEl, strings.failed);
@@ -378,20 +337,16 @@ var dolibarr_mail_templates_load_index = function(strings) {
 };
 
 /**
- * The dialog body. Static markup only: every row and every line of preview
- * text is written later with textContent, never interpolated into HTML.
+ * Dialog markup. Template data is added later with textContent.
  */
 var dolibarr_mail_templates_shell = function(strings) {
-    /* Search and results share one bordered box: the field filters the list
-     * directly under it, and framing them together says so. */
     return '<div class="border rounded p-2">' +
         '<input type="text" id="dolibarr_mail_template_search" class="form-control form-control-sm mb-2"' +
         ' autocomplete="off" placeholder="' + strings.search + '" aria-label="' + strings.search + '">' +
         '<div id="dolibarr_mail_template_list" role="listbox" style="max-height:18rem; overflow-y:auto;"></div>' +
         '</div>' +
-        /* text-break is load-bearing: a marker like __TICKET_USER_ASSIGN__ is
-         * one unbroken word and pushes the dialog past the viewport without
-         * it. */
+        /* text-break: long markers like __TICKET_USER_ASSIGN__ would
+         * overflow the dialog. */
         '<div id="dolibarr_mail_template_preview" class="mt-3" hidden>' +
         '<div class="fw-bold mb-1">' + strings.preview + '</div>' +
         '<div class="border rounded p-2">' +
@@ -409,7 +364,6 @@ var dolibarr_mail_templates_open = function(strings) {
         modalId: 'dolibarr_mail_template_modal'
     });
     dolibarr_mail_templates_state.modal = modal;
-    /* Rebuilt each open, so state cannot leak from a previous session. */
     dolibarr_mail_templates_state.selected = null;
     dolibarr_mail_templates_state.selected_id = null;
 
@@ -431,8 +385,6 @@ var dolibarr_mail_templates_open = function(strings) {
 
     if (nodes.list) {
         nodes.list.addEventListener('click', function(ev) {
-            /* Headings fold their group; rows load a preview. Checked in this
-             * order because a heading is never inside a row. */
             var head = ev.target.closest('[data-group]');
             if (head) {
                 dolibarr_mail_templates_toggle_group(head);
@@ -473,7 +425,7 @@ var dolibarr_mail_templates_init = function() {
     var root = document.getElementById('dolibarr_mail_templates_picker');
     var toggle = document.getElementById('dolibarr_mail_template_toggle');
     if (!root || !toggle) {
-        return; /* not the compose page, or nothing to show */
+        return;
     }
 
     if (toggle.getAttribute('data-dolibarr-bound') === '1') {
@@ -481,10 +433,7 @@ var dolibarr_mail_templates_init = function() {
     }
     toggle.setAttribute('data-dolibarr-bound', '1');
 
-    /* The output module has to render last, or it splits Cypht's button row,
-     * so move it under the message box here. Guarded at every step: an
-     * upstream markup change should leave the trigger where it is, not
-     * throw. */
+    /* Move the picker under the message box. */
     var composeBody = document.getElementById('compose_body');
     if (composeBody) {
         var anchor = composeBody.closest('.form-floating') || composeBody.parentNode;
@@ -506,9 +455,7 @@ var dolibarr_mail_templates_init = function() {
     }
 };
 
-/* Two entry points, because there are two ways to arrive at compose.
- *
- */
+/* Compose can be opened by page load or by Cypht's client-side navigation. */
 var dolibarr_mail_templates_compose_handler = window.applyComposePageHandlers;
 window.applyComposePageHandlers = function(routeParams) {
     var unmount = dolibarr_mail_templates_compose_handler

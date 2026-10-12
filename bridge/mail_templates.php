@@ -17,17 +17,15 @@
 
 /**
  * \file        bridge/mail_templates.php
- * \brief       Dolibarr email templates, for the compose screen in Cypht.
- *
- *              Visibility follows FormMail::getEMailTemplate() in
- *              htdocs/core/class/html.formmail.class.php: entity scoping plus
- *              "private = 0 OR fk_user = me". That clause is the access
- *              control, not a filter.
+ * \brief       Returns the email templates the user can see, as JSON, for
+ *              the Cypht compose screen.
  */
 
-// This is a machine-to-machine JSON endpoint: no session, no menus, no CSRF.
-if (!defined('NOLOGIN')) {
-	define('NOLOGIN', '1');
+// Token auth for server-to-server calls
+if (!empty($_GET['token']) || !empty($_POST['token'])) {
+	if (!defined('NOLOGIN')) {
+		define('NOLOGIN', '1');
+	}
 }
 if (!defined('NOCSRFCHECK')) {
 	define('NOCSRFCHECK', '1');
@@ -69,7 +67,7 @@ if (!$res) {
 }
 
 /**
- * Emit a JSON response and stop.
+ * Send a JSON response and exit.
  *
  * @param int   $status HTTP status code
  * @param array $body   Payload to encode
@@ -100,236 +98,39 @@ if (!isModEnabled('cyphtwebmail')) {
 $login = GETPOST('login', 'aZ09arobase');
 $token = GETPOST('token', 'aZ09');
 
-if ($login === '' || $token === '') {
-	cyphtMailTemplatesRespond(400, array('error' => 'Missing login or token'));
-}
 
 // ---------------------------------------------------------------------
 
-require_once __DIR__.'/../class/install/config.class.php';
-// Not llx_const: dolibarr_set_const() encrypts anything whose name ends
-// in _SECRET, and the webmail reads its copy over raw PDO before
-// Dolibarr is loaded, so the two ends would sign with different values.
-$secret = CyphtConfig::get($db, 'SSO_SHARED_SECRET', '');
-if ($secret === '') {
-	cyphtMailTemplatesRespond(503, array('error' => 'SSO secret not initialised, run the module build first'));
+require_once __DIR__.'/../class/integration/bridgeauth.class.php';
+
+if ($token === '') {
+	/* Session cookie */
+	global $user;
+	if (empty($user->id)) {
+		cyphtMailTemplatesRespond(403, array('error' => 'Not signed in'));
+	}
+	$bridgeUser = $user;
+} else {
+	$authStatus = 403;
+	$authError = '';
+	$bridgeUser = CyphtBridgeAuth::userFromToken($db, $login, $token, 'templates', $authStatus, $authError);
+	if ($bridgeUser === null) {
+		cyphtMailTemplatesRespond($authStatus, array('error' => $authError));
+	}
 }
 
-if (strpos($token, '.') === false) {
-	cyphtMailTemplatesRespond(403, array('error' => 'Malformed token'));
-}
-
-list($timestamp, $signature) = explode('.', $token, 2);
-if (!ctype_digit($timestamp)) {
-	cyphtMailTemplatesRespond(403, array('error' => 'Malformed token'));
-}
-
-if (abs(time() - (int) $timestamp) > 60) {
-	cyphtMailTemplatesRespond(403, array('error' => 'Token expired'));
-}
-
-// Own purpose tag, so a contacts token cannot be replayed against this
-// endpoint and vice versa.
-$expected = hash_hmac('sha256', $login.'|'.$timestamp.'|templates', $secret);
-if (!hash_equals($expected, $signature)) {
-	cyphtMailTemplatesRespond(403, array('error' => 'Bad signature'));
-}
-
-// ---------------------------------------------------------------------
-
-$bridgeUser = new User($db);
-if ($bridgeUser->fetch(0, $login) <= 0) {
-	cyphtMailTemplatesRespond(403, array('error' => 'Unknown user'));
-}
-if (isset($bridgeUser->statut) && $bridgeUser->statut == 0) {
-	cyphtMailTemplatesRespond(403, array('error' => 'Disabled user'));
-}
 $bridgeUser->loadRights();
 
-// NOLOGIN leaves $conf->entity at its default; realign it with the user so
-// getEntity() below filters correctly under Multicompany.
 $conf->entity = ($bridgeUser->entity > 0 ? $bridgeUser->entity : 1);
 
 // ---------------------------------------------------------------------
 
-// Miss a domain and trans() echoes the key back, so labels come out as raw
-// CamelCase. Template labels are themselves keys, living in the lang file of
-// whichever module seeded them.
-$langsArray = array('errors', 'admin', 'mails', 'other');
-foreach (array(
-	'recruitment' => 'recruitment',
-	'member' => 'members',
-	'eventorganization' => 'eventorganization',
-	'holiday' => 'holiday',
-	'partnership' => 'partnership',
-	'ticket' => 'ticket',
-	'project' => 'projects',
-	'invoice' => 'bills',
-	'supplier_invoice' => 'bills',
-	'contract' => 'contracts',
-	'propal' => 'propal',
-	'order' => 'orders',
-	'expensereport' => 'trips',
-) as $module => $domain) {
-	if (isModEnabled($module) && !in_array($domain, $langsArray, true)) {
-		$langsArray[] = $domain;
-	}
-}
-$langs->loadLangs($langsArray);
+require_once __DIR__.'/../class/integration/mailtemplatecollector.class.php';
 
-/**
- * Resolve a template label for display.
- *
- * Labels like '(SendingAdminEmailMessage)' are translation keys. Rule copied
- * from FormMail::getEMailTemplate(), html.formmail.class.php:597.
- *
- * Keys with no en_US translation are split on capitals rather than shown raw
- * as core does.
- *
- * @param string $label Raw label column
- * @param Translate $langs
- * @return string
- */
-function cyphtMailTemplateLabel($label, $langs)
-{
-	$label = trim($label);
-	if (!preg_match('/\((.*)\)/', $label, $reg)) {
-		return $label;
-	}
-
-	$key = $reg[1];
-	$translated = $langs->trans($key);
-	// trans() echoes the key back when there is no translation for it.
-	if ($translated !== $key) {
-		return $translated;
-	}
-
-	$spaced = preg_replace('/(?<!^)([A-Z])/', ' $1', $key);
-
-	return ucfirst(strtolower($spaced));
+$collectError = '';
+$result = CyphtMailTemplateCollector::collect($db, $bridgeUser, $langs, $collectError);
+if ($result === null) {
+	cyphtMailTemplatesRespond(500, array('error' => $collectError));
 }
 
-/**
- * Human label for a type_template token.
- *
- * Map and keys copied from the $elementList block in
- * htdocs/admin/mails_templates.php. Unmapped tokens are prettified, not
- * hidden, so a type this map has not caught up with still shows.
- *
- * @param string $token type_template value
- * @param Translate $langs
- * @return string
- */
-function cyphtMailTemplateTypeLabel($token, $langs)
-{
-	static $map = array(
-		'all' => 'All',
-		'none' => 'None',
-		'user' => 'MailToUser',
-		'member' => 'MailToMember',
-		'thirdparty' => 'MailToThirdparty',
-		'contact' => 'MailToContact',
-		'project' => 'MailToProject',
-		'contract' => 'MailToSendContract',
-		'holiday' => 'MailToSendLeaves',
-		'ticket_send' => 'MailToTicket',
-		'propal_send' => 'MailToSendProposal',
-		'order_send' => 'MailToSendOrder',
-		'facture_send' => 'MailToSendInvoice',
-		'shipping_send' => 'MailToSendShipment',
-		'delivery_send' => 'MailToSendDelivery',
-		'reception_send' => 'MailToSendReception',
-		'fichinter_send' => 'MailToSendIntervention',
-		'actioncomm_send' => 'MailToSendEventPush',
-		'expensereport_send' => 'MailToSendExpenseReport',
-		'supplier_proposal_send' => 'MailToSendSupplierRequestForQuotation',
-		'order_supplier_send' => 'MailToSendSupplierOrder',
-		'invoice_supplier_send' => 'MailToSendSupplierInvoice',
-		'supplier_payment_send' => 'SuppliersPayment',
-		'recruitmentcandidature_send' => 'RecruitmentCandidatures',
-		'conferenceorbooth' => 'MailToSendEventOrganization',
-	);
-
-	if (isset($map[$token])) {
-		$translated = $langs->trans($map[$token]);
-		// trans() echoes the key back when there is no translation.
-		if ($translated !== $map[$token]) {
-			return $translated;
-		}
-	}
-
-	return ucfirst(str_replace('_', ' ', $token));
-}
-
-// Every active template this user may see, of every type. Ordered by type so
-// the grouping in the picker follows the query rather than being re-sorted.
-$sql = "SELECT rowid, label, type_template, lang, position, topic, content,";
-$sql .= " email_from, email_to, email_tocc, email_tobcc";
-$sql .= " FROM ".MAIN_DB_PREFIX."c_email_templates";
-$sql .= " WHERE entity IN (".getEntity('c_email_templates').")";
-$sql .= " AND active = 1";
-// The access control. Copied from FormMail::getEMailTemplate().
-$sql .= " AND (private = 0 OR fk_user = ".((int) $bridgeUser->id).")";
-$sql .= " ORDER BY type_template ASC, position ASC, label ASC";
-
-$resql = $db->query($sql);
-if (!$resql) {
-	cyphtMailTemplatesRespond(500, array('error' => 'Template query failed: '.$db->lasterror()));
-}
-
-// Resolves only object-free markers. Anything written around an object, such
-// as __TICKET_URL__, cannot resolve here because compose has no such object;
-// those are reported in 'placeholders' rather than stripped.
-$substitutions = getCommonSubstitutionArray($langs, 0, null, null);
-
-$templates = array();
-$types = array();
-while ($obj = $db->fetch_object($resql)) {
-	$type = (string) $obj->type_template;
-	$subject = make_substitutions((string) $obj->topic, $substitutions, $langs);
-	$body = make_substitutions((string) $obj->content, $substitutions, $langs);
-
-	// What survived substitution, so the compose screen can warn before the
-	// user sends an email containing a literal __SOMETHING__.
-	$leftover = array();
-	if (preg_match_all('/__[A-Z0-9_]+__/', $subject.' '.$body, $m)) {
-		$leftover = array_values(array_unique($m[0]));
-	}
-
-	$templates[] = array(
-		'id'      => (int) $obj->rowid,
-		'label'   => cyphtMailTemplateLabel((string) $obj->label, $langs),
-		'lang'    => (string) $obj->lang,
-		'type'    => $type,
-		'type_label' => cyphtMailTemplateTypeLabel($type, $langs),
-		'subject' => $subject,
-		'body'    => $body,
-		'placeholders' => $leftover,
-		'from'    => (string) $obj->email_from,
-		'to'      => (string) $obj->email_to,
-		'cc'      => (string) $obj->email_tocc,
-		'bcc'     => (string) $obj->email_tobcc,
-	);
-
-	if (!isset($types[$type])) {
-		$types[$type] = array(
-			'type'  => $type,
-			'label' => cyphtMailTemplateTypeLabel($type, $langs),
-			'count' => 0,
-		);
-	}
-	$types[$type]['count']++;
-}
-$db->free($resql);
-
-cyphtMailTemplatesRespond(200, array(
-	'templates' => $templates,
-	'types'     => array_values($types),
-	'count'     => count($templates),
-	'entity'    => (int) $conf->entity,
-	// The list is legitimately empty on a fresh install, which looks like a
-	// fault from the Cypht side. Say so instead.
-	'hint'      => (count($templates) === 0
-		? 'No email templates yet. Create one in Dolibarr under Home, Setup, Emails, Email templates.'
-		: ''),
-));
+cyphtMailTemplatesRespond(200, $result);
