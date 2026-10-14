@@ -34,6 +34,7 @@ Cypht is LGPL-2.1, Dolibarr is GPL-3.0. This module is LGPL-2.1.
 | Encrypted credentials | Mailbox passwords are encrypted at rest; the rest of the config stays readable SQL |
 | Deep-linkable | The browser URL follows the current Cypht page, so reload and bookmarking work |
 | Lifecycle aware | Deleting or renaming a Dolibarr user cleans up or follows their webmail data |
+| Home page box | A Webmail box on the Dolibarr home page shows unread messages, unread messages from your contacts and flagged messages. The counts are updated while the webmail is open |
 
 ## Requirements
 
@@ -140,6 +141,7 @@ First time: **Servers** → *Add an E-mail Account*
 | What | Where | Notes |
 |---|---|---|
 | Mail accounts + settings | `llx_cyphtwebmail_userconfig` | one row per user, keyed on `fk_user`, cascades on delete |
+| Home page counts | `llx_cyphtwebmail_mailstatus` | one row per user, counts only, no subjects or senders |
 | Secrets | `llx_const` | `CYPHTWEBMAIL_SSO_SECRET`, `CYPHTWEBMAIL_CONFIG_SECRET` |
 | Menu entries | `llx_menu` | written on module activation |
 | Sessions | `documents/cyphtWebmail/sso_sessions/` | transient, garbage collected |
@@ -177,6 +179,8 @@ Set in **Home → Setup → Other**.
 | `CYPHTWEBMAIL_CONTACTS_TIMEOUT` | `5` | bridge HTTP timeout |
 | `CYPHTWEBMAIL_CONTACTS_INSECURE` | `false` | skip TLS verification (self-signed certs) |
 | `CYPHTWEBMAIL_BRIDGE_URL` | auto | override when Dolibarr cannot reach itself by its public URL |
+| `CYPHTWEBMAIL_DASHBOARD` | `true` | show the Webmail box on the home page |
+| `CYPHTWEBMAIL_DELAY_UNREAD` | `2` | days after which unread messages from contacts count as late, `0` for never |
 
 
 ## Troubleshooting
