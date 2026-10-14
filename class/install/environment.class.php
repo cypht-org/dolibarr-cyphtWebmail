@@ -69,7 +69,7 @@ class CyphtEnvironment
 			'ENABLE_MEMCACHED' => 'false',
 			'ENABLE_DEBUG'     => 'false',
 			'DEFAULT_LANGUAGE' => 'en',
-			'CYPHT_MODULES'    => 'core,contacts,dolibarr_contacts,dolibarr_mail_templates,imap,dolibarr_context,smtp,api_login,account,nux,developer,history,saved_searches,advanced_search,profiles,inline_message,imap_folders,keyboard_shortcuts,site,dolibarr_prefs,dynamic_login,sievefilters,themes',
+			'CYPHT_MODULES'    => 'core,contacts,dolibarr_contacts,dolibarr_mail_templates,imap,dolibarr_context,dolibarr_dashboard,smtp,api_login,account,nux,developer,history,saved_searches,advanced_search,profiles,inline_message,imap_folders,keyboard_shortcuts,site,dolibarr_prefs,dynamic_login,sievefilters,themes',
 			'DISABLE_FINGERPRINT' => 'true',
 			'DISABLE_EMPTY_SUPERGLOBALS' => 'true',
 			'DISABLE_OPEN_BASE_DIR' => 'true',
