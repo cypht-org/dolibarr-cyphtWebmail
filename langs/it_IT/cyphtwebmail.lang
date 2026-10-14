@@ -96,5 +96,19 @@ CyphtWebmailThemeModeHelp = Il webmail è integrato nella pagina che lo circonda
 CyphtWebmailThemeFollow = Allineare alla pagina
 CyphtWebmailThemeUser = Scelto nel webmail
 
+CyphtWebmailDashboardSettings = Pagina iniziale
+CyphtWebmailDashboard = Riquadro Webmail
+CyphtWebmailDashboardHelp = Mostra i messaggi non letti e contrassegnati nella pagina iniziale. I numeri si aggiornano mentre il webmail è aperto.
+CyphtWebmailDelayUnread = In ritardo dopo
+CyphtWebmailDelayUnreadHelp = I messaggi non letti dei tuoi contatti più vecchi di questo termine sono contati in ritardo. 0 lo disattiva.
+CyphtDashboardTitle = Webmail
+CyphtDashboardUnread = Messaggi non letti nella posta in arrivo
+CyphtDashboardUnreadShort = Non letti
+CyphtDashboardContacts = Messaggi non letti dei tuoi contatti
+CyphtDashboardContactsShort = Dai tuoi contatti
+CyphtDashboardFlagged = Messaggi contrassegnati nella posta in arrivo
+CyphtDashboardFlaggedShort = Contrassegnati
+CyphtDashboardUpdated = aggiornato %s
+
 SeeSenderRecordsInWebmail = Vedere le schede del mittente nel webmail
 CreateProspectFromWebmail = Creare un potenziale cliente dal mittente di un messaggio
