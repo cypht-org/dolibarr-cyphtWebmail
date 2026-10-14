@@ -29,7 +29,7 @@ class CyphtUpgrade
 	/**
 	 * Increase when adding a migration file or something to provision().
 	 */
-	const SCHEMA_VERSION = 2;
+	const SCHEMA_VERSION = 3;
 
 	/**
 	 * @var string Last error message
