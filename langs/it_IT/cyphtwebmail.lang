@@ -109,6 +109,8 @@ CyphtDashboardContactsShort = Dai tuoi contatti
 CyphtDashboardFlagged = Messaggi contrassegnati nella posta in arrivo
 CyphtDashboardFlaggedShort = Contrassegnati
 CyphtDashboardUpdated = aggiornato %s
+CyphtNewMessage = Nuovo messaggio
+CyphtNewMessageHelp = Scrivere a %s dal tuo webmail
 
 SeeSenderRecordsInWebmail = Vedere le schede del mittente nel webmail
 CreateProspectFromWebmail = Creare un potenziale cliente dal mittente di un messaggio
