@@ -109,6 +109,8 @@ CyphtDashboardContactsShort = Von Ihren Kontakten
 CyphtDashboardFlagged = Gekennzeichnete Nachrichten im Posteingang
 CyphtDashboardFlaggedShort = Gekennzeichnet
 CyphtDashboardUpdated = aktualisiert %s
+CyphtNewMessage = Neue Nachricht
+CyphtNewMessageHelp = An %s aus Ihrem Webmail schreiben
 
 SeeSenderRecordsInWebmail = Absenderdaten im Webmail sehen
 CreateProspectFromWebmail = Aus dem Absender einer Nachricht einen Interessenten anlegen
