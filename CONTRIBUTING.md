@@ -22,7 +22,7 @@ cyphtWebmail/
 │   └── workflows/
 │       └── release.yml             GitHub Actions: tag push triggers release
 ├── index.php                       the Dolibarr page hosting the Cypht iframe
-├── version.inc.php                 module version constant
+├── cyphtwebmail_version.inc.php    module version constant
 ├── build.json                      build metadata
 ├── admin/
 │   ├── setup.php                   settings, build status, Generate button
