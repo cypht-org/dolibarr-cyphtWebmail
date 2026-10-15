@@ -95,6 +95,10 @@ CyphtWebmailThemeMode = Claro u oscuro
 CyphtWebmailThemeModeHelp = El webmail está integrado en la página que lo rodea, así que un webmail claro dentro de una página oscura parece roto. Igualarlo sigue el mismo ajuste de modo oscuro que la página que lo rodea y lo aplica en cada inicio de sesión, por lo que un tema elegido dentro del webmail no se mantendrá.
 CyphtWebmailThemeFollow = Igualar a la página
 CyphtWebmailThemeUser = Elegido en el webmail
+CyphtWebmailComposeMode = Formato de los mensajes
+CyphtWebmailComposeModeHelp = HTML da a cada usuario el editor de texto enriquecido (fuentes, colores, listas, tablas, enlaces) y se aplica en cada inicio de sesión. La segunda opción deja el ajuste de formato del webmail como está.
+CyphtWebmailComposeHtml = HTML (editor de texto enriquecido)
+CyphtWebmailComposeUser = Elegido en el webmail
 
 CyphtWebmailDashboardSettings = Página de inicio
 CyphtWebmailDashboard = Recuadro Webmail
