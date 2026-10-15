@@ -74,6 +74,26 @@ function dolibarr_apply_theme($user_config, $session, $request, $config, $user, 
 }
 
 /**
+ * Set the outbound mail format chosen on the Dolibarr setup page.
+ *
+ * @param object $user_config user configuration object
+ * @param object $session user session object
+ * @param object $request page request object
+ * @param object $config site configuration object
+ * @param string $user username
+ * @param string $pass password
+ * @return void
+ */
+function dolibarr_apply_compose_type($user_config, $session, $request, $config, $user, $pass) {
+    $type = trim((string) Hm_Environment::get('DOLIBARR_USER_COMPOSE_TYPE', ''));
+    if ($type !== '0' && $type !== '1') {
+        return;
+    }
+
+    $user_config->set('smtp_compose_type_setting', (int) $type);
+}
+
+/**
  * Pass the "follow the browser theme" flag to the page.
  * @subpackage dolibarr_prefs/handler
  */
