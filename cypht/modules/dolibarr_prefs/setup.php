@@ -4,6 +4,7 @@ if (!defined('DEBUG_MODE')) { die(); }
 
 add_handler('functional_api', 'dolibarr_apply_language', true, 'dolibarr_prefs');
 add_handler('functional_api', 'dolibarr_apply_theme', true, 'dolibarr_prefs');
+add_handler('functional_api', 'dolibarr_apply_compose_type', true, 'dolibarr_prefs');
 
 handler_source('dolibarr_prefs');
 output_source('dolibarr_prefs');
