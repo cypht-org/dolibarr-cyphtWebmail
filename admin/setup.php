@@ -115,6 +115,9 @@ if ($action == 'update_settings') {
 	dolibarr_set_const($db, 'CYPHTWEBMAIL_THEME_MODE',
 		(GETPOST('theme_mode', 'aZ09') === 'user' ? 'user' : 'follow'), 'chaine', 0, '', $conf->entity);
 
+	dolibarr_set_const($db, 'CYPHTWEBMAIL_COMPOSE_MODE',
+		(GETPOST('compose_mode', 'aZ09') === 'user' ? 'user' : 'html'), 'chaine', 0, '', $conf->entity);
+
 	dolibarr_set_const($db, 'CYPHTWEBMAIL_DASHBOARD',
 		(GETPOST('dashboard', 'alpha') ? 'true' : 'false'), 'chaine', 0, '', $conf->entity);
 
@@ -217,6 +220,13 @@ if ($tab == 'settings') {
 		'follow' => $langs->trans("CyphtWebmailThemeFollow"),
 		'user' => $langs->trans("CyphtWebmailThemeUser"),
 	), getDolGlobalString('CYPHTWEBMAIL_THEME_MODE', 'follow'), 0);
+	print '</td></tr>';
+
+	print '<tr class="oddeven"><td class="titlefield">'.$label("CyphtWebmailComposeMode").'</td><td>';
+	print $form->selectarray('compose_mode', array(
+		'html' => $langs->trans("CyphtWebmailComposeHtml"),
+		'user' => $langs->trans("CyphtWebmailComposeUser"),
+	), getDolGlobalString('CYPHTWEBMAIL_COMPOSE_MODE', 'html'), 0);
 	print '</td></tr>';
 	print '</table>';
 
