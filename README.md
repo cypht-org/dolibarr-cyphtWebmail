@@ -4,6 +4,8 @@ A Dolibarr module that embeds [Cypht](https://cypht.org), a lightweight open
 source webmail client, inside Dolibarr - with single sign-on, Dolibarr contacts
 as an address book, and mail accounts stored in Dolibarr's own database.
 
+![Writing to an invoice contact from the webmail, with the HTML editor and an email template](docs/screenshot.png)
+
 - Cypht upstream: <https://github.com/cypht-org/cypht>
 - Cypht docs: <https://cypht.org>
 - Dolibarr: <https://www.dolibarr.org>
