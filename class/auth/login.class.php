@@ -142,6 +142,16 @@ class CyphtLogin
 	}
 
 	/**
+	 * '1' for the HTML editor, or empty if users choose their own format.
+	 *
+	 * @return string
+	 */
+	private function resolvedComposeType()
+	{
+		return getDolGlobalString('CYPHTWEBMAIL_COMPOSE_MODE', 'html') === 'html' ? '1' : '';
+	}
+
+	/**
 	 * Put the preferences in the environment for the dolibarr_prefs module
 	 * set to read during cypht_login().
 	 *
@@ -154,6 +164,7 @@ class CyphtLogin
 			'DOLIBARR_USER_LANG' => $this->resolvedLanguage($userLang),
 			'DOLIBARR_USER_THEME' => $this->resolvedTheme(),
 			'DOLIBARR_USER_THEME_AUTO' => $this->resolvedThemeAuto(),
+			'DOLIBARR_USER_COMPOSE_TYPE' => $this->resolvedComposeType(),
 		);
 
 		foreach ($values as $key => $value) {
@@ -171,7 +182,7 @@ class CyphtLogin
 	private function preferenceFingerprint($userLang)
 	{
 		$parts = $this->resolvedLanguage($userLang) . '|' . $this->resolvedTheme()
-			. '|' . $this->resolvedThemeAuto();
+			. '|' . $this->resolvedThemeAuto() . '|' . $this->resolvedComposeType();
 
 		return substr(hash('sha256', $parts), 0, 16);
 	}
