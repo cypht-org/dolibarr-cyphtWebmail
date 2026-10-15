@@ -94,6 +94,49 @@ class ActionsCyphtwebmail extends CommonHookActions
 	}
 
 	/**
+	 * Add a "New message" button to third party, contact and invoice cards.
+	 *
+	 * @param array<string,mixed> $parameters Hook parameters
+	 * @param CommonObject $object Object shown on the card
+	 * @param string $action Action
+	 * @param HookManager $hookmanager Hook manager
+	 * @return int 0
+	 */
+	public function addMoreActionsButtons($parameters, &$object, &$action, $hookmanager)
+	{
+		global $langs;
+
+		if (!isModEnabled('cyphtwebmail') || !$this->isContext($parameters, array('thirdpartycard', 'contactcard', 'invoicecard'))) {
+			return 0;
+		}
+
+		$email = '';
+		$subject = '';
+		if ($object->element == 'facture') {
+			if (empty($object->thirdparty)) {
+				$object->fetch_thirdparty();
+			}
+			$email = empty($object->thirdparty->email) ? '' : $object->thirdparty->email;
+			$subject = $langs->transnoentitiesnoconv('Invoice').' '.$object->ref;
+		} elseif (!empty($object->email)) {
+			$email = $object->email;
+		}
+
+		if ($email === '') {
+			return 0;
+		}
+
+		$mailto = 'mailto:'.$email.($subject !== '' ? '?subject='.rawurlencode($subject) : '');
+		$url = dol_buildpath('/cyphtwebmail/index.php', 1).'?cypht='.urlencode('page=compose&compose_to='.rawurlencode($mailto));
+
+		$langs->load('cyphtwebmail@cyphtwebmail');
+		$text = img_picto('', 'fa-envelope-open-text', 'class="pictofixedwidth"').$langs->trans('CyphtNewMessage');
+		print dolGetButtonAction($langs->trans('CyphtNewMessageHelp', $email), $text, 'default', $url);
+
+		return 0;
+	}
+
+	/**
 	 * @return bool
 	 */
 	private function dashboardEnabled()
