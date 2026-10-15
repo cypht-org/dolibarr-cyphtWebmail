@@ -22,5 +22,5 @@
  */
 
 if (!defined('CYPHTWEBMAIL_VERSION')) {
-	define('CYPHTWEBMAIL_VERSION', '1.1.0');
+	define('CYPHTWEBMAIL_VERSION', '1.2.0');
 }
