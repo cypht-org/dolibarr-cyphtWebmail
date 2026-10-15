@@ -807,6 +807,13 @@ class CyphtPipeline
 		}
 		$emit("Patched missing hm_exists() guards in modules/core/functions.php (upstream gap, needed for SSO).\n");
 
+		if (!$this->upstreamPatcher->patchMimeMessage()) {
+			$this->error = $this->upstreamPatcher->error;
+			$emit($this->error . "\n", 'err');
+			return array('success' => false, 'output' => $log, 'error' => $this->error);
+		}
+		$emit("Patched the HTML message format in modules/smtp/hm-mime-message.php.\n");
+
 		$phpBinary = $this->findPhpBinary();
 		if ($phpBinary === null) {
 			$emit("No usable PHP CLI executable found. PHP is running as an Apache module here, so PHP_BINARY " .
