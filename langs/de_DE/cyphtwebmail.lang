@@ -96,5 +96,21 @@ CyphtWebmailThemeModeHelp = Das Webmail ist in die umgebende Seite eingebettet, 
 CyphtWebmailThemeFollow = An die Seite angleichen
 CyphtWebmailThemeUser = Im Webmail gewählt
 
+CyphtWebmailDashboardSettings = Startseite
+CyphtWebmailDashboard = Webmail-Kachel
+CyphtWebmailDashboardHelp = Zeigt ungelesene und gekennzeichnete Nachrichten auf der Startseite. Die Zahlen werden aktualisiert, solange das Webmail geöffnet ist.
+CyphtWebmailDelayUnread = Verspätet nach
+CyphtWebmailDelayUnreadHelp = Ungelesene Nachrichten Ihrer Kontakte, die älter sind, gelten als verspätet. 0 schaltet es aus.
+CyphtDashboardTitle = Webmail
+CyphtDashboardUnread = Ungelesene Nachrichten im Posteingang
+CyphtDashboardUnreadShort = Ungelesen
+CyphtDashboardContacts = Ungelesene Nachrichten Ihrer Kontakte
+CyphtDashboardContactsShort = Von Ihren Kontakten
+CyphtDashboardFlagged = Gekennzeichnete Nachrichten im Posteingang
+CyphtDashboardFlaggedShort = Gekennzeichnet
+CyphtDashboardUpdated = aktualisiert %s
+CyphtNewMessage = Neue Nachricht
+CyphtNewMessageHelp = An %s aus Ihrem Webmail schreiben
+
 SeeSenderRecordsInWebmail = Absenderdaten im Webmail sehen
 CreateProspectFromWebmail = Aus dem Absender einer Nachricht einen Interessenten anlegen

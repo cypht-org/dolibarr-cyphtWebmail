@@ -96,5 +96,21 @@ CyphtWebmailThemeModeHelp = The webmail is embedded in the page around it, so a 
 CyphtWebmailThemeFollow = Match the page around it
 CyphtWebmailThemeUser = Chosen in the webmail
 
+CyphtWebmailDashboardSettings = Home page
+CyphtWebmailDashboard = Webmail box
+CyphtWebmailDashboardHelp = Shows unread and flagged messages on the home page. The numbers are updated while the webmail is open.
+CyphtWebmailDelayUnread = Late after
+CyphtWebmailDelayUnreadHelp = Unread messages from your contacts older than this are counted as late. 0 turns it off.
+CyphtDashboardTitle = Webmail
+CyphtDashboardUnread = Unread messages in the inbox
+CyphtDashboardUnreadShort = Unread
+CyphtDashboardContacts = Unread messages from your contacts
+CyphtDashboardContactsShort = From your contacts
+CyphtDashboardFlagged = Flagged messages in the inbox
+CyphtDashboardFlaggedShort = Flagged
+CyphtDashboardUpdated = updated %s
+CyphtNewMessage = New message
+CyphtNewMessageHelp = Write to %s from your webmail
+
 SeeSenderRecordsInWebmail = See the sender's records in the webmail
 CreateProspectFromWebmail = Create a prospect from a message sender

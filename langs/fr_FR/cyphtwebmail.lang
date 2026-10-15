@@ -96,5 +96,21 @@ CyphtWebmailThemeModeHelp = Le webmail est intégré dans la page qui l'entoure 
 CyphtWebmailThemeFollow = Accorder à la page
 CyphtWebmailThemeUser = Choisi dans le webmail
 
+CyphtWebmailDashboardSettings = Page d'accueil
+CyphtWebmailDashboard = Encart Webmail
+CyphtWebmailDashboardHelp = Affiche les messages non lus et marqués sur la page d'accueil. Les chiffres sont mis à jour tant que le webmail est ouvert.
+CyphtWebmailDelayUnread = En retard après
+CyphtWebmailDelayUnreadHelp = Les messages non lus de vos contacts plus anciens que ce délai sont comptés en retard. 0 désactive.
+CyphtDashboardTitle = Webmail
+CyphtDashboardUnread = Messages non lus dans la boîte de réception
+CyphtDashboardUnreadShort = Non lus
+CyphtDashboardContacts = Messages non lus de vos contacts
+CyphtDashboardContactsShort = De vos contacts
+CyphtDashboardFlagged = Messages marqués dans la boîte de réception
+CyphtDashboardFlaggedShort = Marqués
+CyphtDashboardUpdated = mis à jour le %s
+CyphtNewMessage = Nouveau message
+CyphtNewMessageHelp = Écrire à %s depuis votre webmail
+
 SeeSenderRecordsInWebmail = Voir les fiches de l'expéditeur dans le webmail
 CreateProspectFromWebmail = Créer un prospect depuis l'expéditeur d'un message

@@ -81,6 +81,7 @@ if ($action == 'update_settings') {
 		'CYPHTWEBMAIL_CONTACTS_MAX' => array('contacts_max', 1, 100000),
 		// bridge/context.php allows 10 at most.
 		'CYPHTWEBMAIL_CONTEXT_ROWS' => array('context_rows', 1, 10),
+		'CYPHTWEBMAIL_DELAY_UNREAD' => array('delay_unread', 0, 30),
 	);
 
 	$clamped = 0;
@@ -113,6 +114,9 @@ if ($action == 'update_settings') {
 
 	dolibarr_set_const($db, 'CYPHTWEBMAIL_THEME_MODE',
 		(GETPOST('theme_mode', 'aZ09') === 'user' ? 'user' : 'follow'), 'chaine', 0, '', $conf->entity);
+
+	dolibarr_set_const($db, 'CYPHTWEBMAIL_DASHBOARD',
+		(GETPOST('dashboard', 'alpha') ? 'true' : 'false'), 'chaine', 0, '', $conf->entity);
 
 	if ($clamped > 0) {
 		setEventMessages($langs->trans("CyphtWebmailValueOutOfRange"), null, 'warnings');
@@ -214,6 +218,11 @@ if ($tab == 'settings') {
 		'user' => $langs->trans("CyphtWebmailThemeUser"),
 	), getDolGlobalString('CYPHTWEBMAIL_THEME_MODE', 'follow'), 0);
 	print '</td></tr>';
+	print '</table>';
+
+	$sectionStart("CyphtWebmailDashboardSettings");
+	$switchRow("CyphtWebmailDashboard", 'dashboard', 'CYPHTWEBMAIL_DASHBOARD');
+	$numberRow("CyphtWebmailDelayUnread", 'delay_unread', 'CYPHTWEBMAIL_DELAY_UNREAD', 2, 'days');
 	print '</table>';
 
 	print '<div class="center" style="margin-top: 10px;">';
