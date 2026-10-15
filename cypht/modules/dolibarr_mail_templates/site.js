@@ -236,6 +236,46 @@ var dolibarr_mail_templates_hide_undo = function() {
 };
 
 /**
+ * The HTML editor of the compose page, or null in plain text mode.
+ */
+var dolibarr_mail_templates_editor = function() {
+    var form = document.querySelector('.compose_form');
+    if (!form || form.getAttribute('data-compose-type') !== '1' || !window.kindEditor) {
+        return null;
+    }
+    return window.kindEditor;
+};
+
+/* Like Dolibarr's dol_textishtml(): look for real HTML tags. */
+var dolibarr_mail_templates_is_html = function(body) {
+    return /<\/?(html|body|p|br|div|span|font|b|strong|i|em|u|a|ul|ol|li|pre|table|tr|td|th|h[1-6]|img|blockquote|hr)(\s[^>]*)?\/?>/i.test(body);
+};
+
+/**
+ * Template body for the HTML editor.
+ */
+var dolibarr_mail_templates_as_html = function(body) {
+    if (dolibarr_mail_templates_is_html(body)) {
+        return body;
+    }
+    var div = document.createElement('div');
+    div.textContent = body;
+    return div.innerHTML.replace(/\r?\n/g, '<br>');
+};
+
+/**
+ * Template body for the plain text editor, with line breaks kept.
+ */
+var dolibarr_mail_templates_as_text = function(body) {
+    if (!dolibarr_mail_templates_is_html(body)) {
+        return body;
+    }
+    var html = body.replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|li|tr|h[1-6])>/gi, '\n');
+    var doc = new DOMParser().parseFromString(html, 'text/html');
+    return (doc.body.textContent || '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+};
+
+/**
  * Insert the selected template into the compose fields, saving the old
  * values for undo.
  */
@@ -247,28 +287,32 @@ var dolibarr_mail_templates_insert = function(strings) {
     var nodes = dolibarr_mail_templates_nodes();
     var subject = document.getElementById('compose_subject');
     var body = document.getElementById('compose_body');
+    var editor = dolibarr_mail_templates_editor();
 
     dolibarr_mail_templates_state.undo = {
         subject: subject ? subject.value : null,
-        body: body ? body.value : null
+        body: editor ? editor.html() : (body ? body.value : null),
+        editor: !!editor
     };
 
     if (subject && subject.value === '') {
         subject.value = template.subject;
     }
 
-    if (body) {
-        var start = body.selectionStart || 0;
-        var end = body.selectionEnd || 0;
-        var value = body.value;
-        body.value = value.slice(0, start) + template.body + value.slice(end);
-        body.selectionStart = body.selectionEnd = start + template.body.length;
-    }
-
     if (dolibarr_mail_templates_state.modal) {
         dolibarr_mail_templates_state.modal.hide();
     }
-    if (body) {
+
+    if (editor) {
+        editor.focus();
+        editor.insertHtml(dolibarr_mail_templates_as_html(template.body));
+    } else if (body) {
+        var text = dolibarr_mail_templates_as_text(template.body);
+        var start = body.selectionStart || 0;
+        var end = body.selectionEnd || 0;
+        var value = body.value;
+        body.value = value.slice(0, start) + text + value.slice(end);
+        body.selectionStart = body.selectionEnd = start + text.length;
         body.focus();
     }
 
@@ -294,7 +338,10 @@ var dolibarr_mail_templates_undo = function() {
     if (subject && previous.subject !== null) {
         subject.value = previous.subject;
     }
-    if (body && previous.body !== null) {
+    var editor = previous.editor ? dolibarr_mail_templates_editor() : null;
+    if (editor && previous.body !== null) {
+        editor.html(previous.body);
+    } else if (body && previous.body !== null) {
         body.value = previous.body;
     }
     dolibarr_mail_templates_hide_undo();

@@ -20,8 +20,7 @@ require_once __DIR__ . '/../install/paths.class.php';
 /**
  * \file        class/install/upstreampatches.class.php
  * \ingroup     cyphtWebmail
- * \brief       Patches Cypht so modules/core/functions.php can be loaded twice
- *              in one request, which happens during SSO login.
+ * \brief       Fixes applied to the Cypht sources at build time.
  */
 class CyphtUpstreamPatches
 {
@@ -50,7 +49,43 @@ class CyphtUpstreamPatches
 	 */
 	public function patchCoreFunctionsGuard()
 	{
-		$path = $this->paths->getCyphtPath() . '/modules/core/functions.php';
+		return $this->patchFile('/modules/core/functions.php', function ($content) {
+			return $this->wrapUnguardedTopLevelFunctions($content);
+		});
+	}
+
+	/**
+	 * Fix HTML messages in modules/smtp/hm-mime-message.php: add the blank
+	 * line after the headers and the closing boundary. SMTP servers reject
+	 * the message without them.
+	 *
+	 * @return bool
+	 */
+	public function patchMimeMessage()
+	{
+		return $this->patchFile('/modules/smtp/hm-mime-message.php', function ($content) {
+			$content = str_replace('$res .= $this->text_body;', '$res .= "\r\n".$this->text_body;', $content);
+
+			$pattern = '/(' . preg_quote('format=flowed\r\n".', '/') . '\s*'
+				. preg_quote('"Content-Transfer-Encoding: quoted-printable\r\n\r\n%s', '/') . ')",(\s*)'
+				. preg_quote('$this->boundary, $this->format_message_text($body));', '/') . '/';
+
+			return preg_replace_callback($pattern, function ($m) {
+				return $m[1] . '\r\n--%s--\r\n",' . $m[2] . '$this->boundary, $this->format_message_text($body), $this->boundary);';
+			}, $content);
+		});
+	}
+
+	/**
+	 * Rewrite a Cypht file with $patch, if it changes anything.
+	 *
+	 * @param string $file Path inside the Cypht package
+	 * @param callable $patch Takes and returns the file content
+	 * @return bool
+	 */
+	private function patchFile($file, $patch)
+	{
+		$path = $this->paths->getCyphtPath() . $file;
 		if (!is_readable($path)) {
 			return true;
 		}
@@ -61,7 +96,11 @@ class CyphtUpstreamPatches
 			return false;
 		}
 
-		$patched = $this->wrapUnguardedTopLevelFunctions($content);
+		$patched = $patch($content);
+		if ($patched === null) {
+			$this->error = 'Could not patch ' . $path;
+			return false;
+		}
 		if ($patched === $content) {
 			return true;
 		}

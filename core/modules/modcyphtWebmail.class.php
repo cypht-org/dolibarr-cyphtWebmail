@@ -143,7 +143,11 @@ class modcyphtWebmail extends DolibarrModules
 				'index',
 				'thirdpartycard',
 				'contactcard',
+				'propalcard',
+				'ordercard',
 				'invoicecard',
+				'ordersuppliercard',
+				'invoicesuppliercard',
 			),
 			/* END MODULEBUILDER HOOKSCONTEXTS */
 			// Set this to 1 if features of module are opened to external users

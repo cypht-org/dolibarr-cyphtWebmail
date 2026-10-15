@@ -95,6 +95,10 @@ CyphtWebmailThemeMode = Light or dark
 CyphtWebmailThemeModeHelp = The webmail is embedded in the page around it, so a light webmail inside a dark page looks broken. Matching follows the same dark mode setting the surrounding page uses, and applies it on each sign-in, which means a theme picked inside the webmail will not stick.
 CyphtWebmailThemeFollow = Match the page around it
 CyphtWebmailThemeUser = Chosen in the webmail
+CyphtWebmailComposeMode = Message format
+CyphtWebmailComposeModeHelp = HTML gives every user the rich text editor (fonts, colours, lists, tables, links) and is applied on each sign-in. The second leaves the format setting of the webmail alone.
+CyphtWebmailComposeHtml = HTML (rich text editor)
+CyphtWebmailComposeUser = Chosen in the webmail
 
 CyphtWebmailDashboardSettings = Home page
 CyphtWebmailDashboard = Webmail box
