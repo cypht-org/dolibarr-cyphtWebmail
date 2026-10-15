@@ -1,8 +1,7 @@
 name: Release
 
-# Pushing a tag is the whole release. The tag only triggers and labels; the
-# version itself comes from version.inc.php, and the job refuses to build if
-# the two disagree.
+# Pushing a tag makes the release. The tag must match the version in
+# cyphtwebmail_version.inc.php.
 on:
   push:
     tags:
@@ -30,14 +29,14 @@ jobs:
           coverage: none
           ini-values: memory_limit=-1
 
-      - name: Check the tag matches version.inc.php
+      - name: Check the tag matches cyphtwebmail_version.inc.php
         run: |
           set -euo pipefail
           tag="${GITHUB_REF_NAME#v}"
-          src=$(php -r 'require "version.inc.php"; echo CYPHTWEBMAIL_VERSION;')
-          echo "tag=$tag  version.inc.php=$src"
+          src=$(php -r 'require "cyphtwebmail_version.inc.php"; echo CYPHTWEBMAIL_VERSION;')
+          echo "tag=$tag  cyphtwebmail_version.inc.php=$src"
           if [ "$tag" != "$src" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match CYPHTWEBMAIL_VERSION ($src). Bump version.inc.php, or retag."
+            echo "::error::Tag $GITHUB_REF_NAME does not match CYPHTWEBMAIL_VERSION ($src). Bump cyphtwebmail_version.inc.php, or retag."
             exit 1
           fi
 
