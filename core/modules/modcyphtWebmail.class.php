@@ -141,6 +141,9 @@ class modcyphtWebmail extends DolibarrModules
 			/* BEGIN MODULEBUILDER HOOKSCONTEXTS */
 			'hooks' => array(
 				'index',
+				'thirdpartycard',
+				'contactcard',
+				'invoicecard',
 			),
 			/* END MODULEBUILDER HOOKSCONTEXTS */
 			// Set this to 1 if features of module are opened to external users
