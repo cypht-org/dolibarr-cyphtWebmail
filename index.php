@@ -101,13 +101,13 @@ if (!$manager->isPublished()) {
 	$frameUrl = $publicUrl.($cyphtQuery !== '' ? '?'.$cyphtQuery : '');
 
 	print '<iframe id="cyphtwebmail-frame" src="'.dol_escape_htmltag($frameUrl).'" '.
-		'style="width:100%; height: calc(100vh - 220px); min-height: 500px; border: none;" '.
+		'style="display: block; width: 100%; height: calc(100vh - 220px); min-height: 400px; border: none;" '.
 		'title="Cypht Webmail"></iframe>';
 
-	$syncScript = dol_buildpath('/cyphtwebmail/js/cypht-url-sync.js', 1);
-	$syncVersion = @filemtime(__DIR__.'/js/cypht-url-sync.js');
-
-	print '<script src="'.dol_escape_htmltag($syncScript.($syncVersion ? '?v='.$syncVersion : '')).'"></script>';
+	foreach (array('cypht-frame-size.js', 'cypht-url-sync.js') as $script) {
+		$version = @filemtime(__DIR__.'/js/'.$script);
+		print '<script src="'.dol_escape_htmltag(dol_buildpath('/cyphtwebmail/js/'.$script, 1).($version ? '?v='.$version : '')).'"></script>';
+	}
 }
 
 llxFooter();
