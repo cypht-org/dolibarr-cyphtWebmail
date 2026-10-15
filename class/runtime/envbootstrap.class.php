@@ -69,7 +69,8 @@ class CyphtEnvBootstrap
 		}
 
 		foreach ($values as $key => $value) {
-			if ($value === null || $value === '') {
+			// DB_PASS can be empty, e.g. XAMPP's root user.
+			if ($value === null || ($value === '' && $key !== 'DB_PASS')) {
 				continue;
 			}
 
