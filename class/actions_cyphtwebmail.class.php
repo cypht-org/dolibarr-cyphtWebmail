@@ -24,6 +24,18 @@ require_once DOL_DOCUMENT_ROOT.'/core/class/commonhookactions.class.php';
 
 class ActionsCyphtwebmail extends CommonHookActions
 {
+	/** Cards that get the "New message" button */
+	const MESSAGE_CONTEXTS = array('thirdpartycard', 'contactcard', 'propalcard', 'ordercard', 'invoicecard', 'ordersuppliercard', 'invoicesuppliercard');
+
+	/** Documents: contact types to write to, in order, and the subject Dolibarr uses */
+	const DOCUMENTS = array(
+		'propal' => array('contacts' => array('CUSTOMER', 'BILLING'), 'topic' => 'SendPropalRef'),
+		'commande' => array('contacts' => array('CUSTOMER', 'BILLING'), 'topic' => 'SendOrderRef'),
+		'facture' => array('contacts' => array('BILLING'), 'topic' => 'SendBillRef'),
+		'order_supplier' => array('contacts' => array('CUSTOMER', 'BILLING'), 'topic' => 'SendOrderRef'),
+		'invoice_supplier' => array('contacts' => array('BILLING'), 'topic' => 'SendBillRef'),
+	);
+
 	/**
 	 * @var DoliDB
 	 */
@@ -94,7 +106,7 @@ class ActionsCyphtwebmail extends CommonHookActions
 	}
 
 	/**
-	 * Add a "New message" button to third party, contact and invoice cards.
+	 * Add a "New message" button to third party, contact and document cards.
 	 *
 	 * @param array<string,mixed> $parameters Hook parameters
 	 * @param CommonObject $object Object shown on the card
@@ -106,34 +118,63 @@ class ActionsCyphtwebmail extends CommonHookActions
 	{
 		global $langs;
 
-		if (!isModEnabled('cyphtwebmail') || !$this->isContext($parameters, array('thirdpartycard', 'contactcard', 'invoicecard'))) {
+		if (!isModEnabled('cyphtwebmail') || !$this->isContext($parameters, self::MESSAGE_CONTEXTS)) {
 			return 0;
 		}
 
-		$email = '';
 		$subject = '';
-		if ($object->element == 'facture') {
-			if (empty($object->thirdparty)) {
-				$object->fetch_thirdparty();
-			}
-			$email = empty($object->thirdparty->email) ? '' : $object->thirdparty->email;
-			$subject = $langs->transnoentitiesnoconv('Invoice').' '.$object->ref;
-		} elseif (!empty($object->email)) {
-			$email = $object->email;
+		if (isset(self::DOCUMENTS[$object->element])) {
+			$document = self::DOCUMENTS[$object->element];
+			$email = $this->documentEmail($object, $document['contacts']);
+
+			// Same subject as Dolibarr's own "Send email" form
+			$langs->loadLangs(array('bills', 'commercial'));
+			$ref = $object->ref.(empty($object->ref_client) ? '' : ' ('.$object->ref_client.')');
+			$subject = $langs->transnoentitiesnoconv($document['topic'], $ref);
+		} else {
+			$email = empty($object->email) ? '' : $object->email;
 		}
 
 		if ($email === '') {
 			return 0;
 		}
 
-		$mailto = 'mailto:'.$email.($subject !== '' ? '?subject='.rawurlencode($subject) : '');
-		$url = dol_buildpath('/cyphtwebmail/index.php', 1).'?cypht='.urlencode('page=compose&compose_to='.rawurlencode($mailto));
+		$cypht = 'page=compose&compose_to='.rawurlencode('mailto:'.$email.'?subject='.rawurlencode($subject));
+		if ($subject === '' || strlen($cypht) > 300) {
+			$cypht = 'page=compose&compose_to='.rawurlencode('mailto:'.$email);
+		}
+		$url = dol_buildpath('/cyphtwebmail/index.php', 1).'?cypht='.urlencode($cypht);
 
 		$langs->load('cyphtwebmail@cyphtwebmail');
 		$text = img_picto('', 'fa-envelope-open-text', 'class="pictofixedwidth"').$langs->trans('CyphtNewMessage');
 		print dolGetButtonAction($langs->trans('CyphtNewMessageHelp', $email), $text, 'default', $url);
 
 		return 0;
+	}
+
+	/**
+	 * Email of the document's first contact of the given types, or of its third party.
+	 *
+	 * @param CommonObject $object Document
+	 * @param string[] $codes Contact types, in order of preference
+	 * @return string
+	 */
+	private function documentEmail($object, $codes)
+	{
+		foreach ($codes as $code) {
+			$contacts = $object->liste_contact(-1, 'external', 0, $code);
+			foreach (is_array($contacts) ? $contacts : array() as $contact) {
+				if (!empty($contact['email'])) {
+					return $contact['email'];
+				}
+			}
+		}
+
+		if (empty($object->thirdparty)) {
+			$object->fetch_thirdparty();
+		}
+
+		return empty($object->thirdparty->email) ? '' : $object->thirdparty->email;
 	}
 
 	/**
