@@ -95,6 +95,10 @@ CyphtWebmailThemeMode = Hell oder dunkel
 CyphtWebmailThemeModeHelp = Das Webmail ist in die umgebende Seite eingebettet, daher wirkt ein helles Webmail in einer dunklen Seite fehlerhaft. Die Angleichung folgt derselben Dunkelmodus-Einstellung wie die umgebende Seite und wendet sie bei jeder Anmeldung an, sodass ein im Webmail gewähltes Design nicht bestehen bleibt.
 CyphtWebmailThemeFollow = An die Seite angleichen
 CyphtWebmailThemeUser = Im Webmail gewählt
+CyphtWebmailComposeMode = Nachrichtenformat
+CyphtWebmailComposeModeHelp = HTML gibt jedem Benutzer den Rich-Text-Editor (Schriften, Farben, Listen, Tabellen, Links) und wird bei jeder Anmeldung angewendet. Die zweite Option lässt die Formateinstellung des Webmails unverändert.
+CyphtWebmailComposeHtml = HTML (Rich-Text-Editor)
+CyphtWebmailComposeUser = Im Webmail gewählt
 
 CyphtWebmailDashboardSettings = Startseite
 CyphtWebmailDashboard = Webmail-Kachel
