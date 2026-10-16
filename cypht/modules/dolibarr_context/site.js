@@ -25,6 +25,7 @@ var dolibarr_context_strings = function(root) {
         more: root.getAttribute('data-str-more') || '',
         details: root.getAttribute('data-str-details') || '',
         customer: root.getAttribute('data-str-customer') || '',
+        prospect: root.getAttribute('data-str-prospect') || '',
         supplier: root.getAttribute('data-str-supplier') || '',
         add: root.getAttribute('data-str-add') || '',
         addWhy: root.getAttribute('data-str-add-why') || '',
@@ -218,6 +219,9 @@ var dolibarr_context_label = function(data, strings) {
         /* The company is the sender. */
         if (party.is_customer) {
             return { text: strings.customer, url: party.url, showBadges: false };
+        }
+        if (party.is_prospect) {
+            return { text: strings.prospect, url: party.url, showBadges: false };
         }
         if (party.is_supplier) {
             return { text: strings.supplier, url: party.url, showBadges: false };
@@ -466,6 +470,8 @@ var dolibarr_context_render = function(root, strings, data, status) {
         var party = data.thirdparty;
         if (party && party.is_customer) {
             body.appendChild(dolibarr_context_badge(strings.customer, 'bg-primary-subtle text-primary-emphasis'));
+        } else if (party && party.is_prospect) {
+            body.appendChild(dolibarr_context_badge(strings.prospect, 'bg-warning-subtle text-warning-emphasis'));
         }
         if (party && party.is_supplier) {
             body.appendChild(dolibarr_context_badge(strings.supplier, 'bg-info-subtle text-info-emphasis'));
