@@ -42,7 +42,7 @@ class CyphtEnvBootstrap
 	}
 
 	/**
-	 * Put the configuration in the environment before Cypht loads it.
+	 * Put the configuration in $_ENV before Cypht loads it.
 	 * Values already set (e.g. from a .env file) are kept.
 	 *
 	 * @return bool True if all values were loaded
@@ -74,15 +74,9 @@ class CyphtEnvBootstrap
 				continue;
 			}
 
-			if (array_key_exists($key, $_ENV) && $_ENV[$key] !== '') {
-				$value = $_ENV[$key];
-			} else {
+			/* No putenv(): the process environment is shared with other requests. */
+			if (!array_key_exists($key, $_ENV) || $_ENV[$key] === '') {
 				$_ENV[$key] = (string) $value;
-			}
-
-			/* Hm_Environment reads $_ENV, env() only reads getenv(). */
-			if (getenv($key) === false) {
-				putenv($key . '=' . $value);
 			}
 		}
 
@@ -350,5 +344,28 @@ class CyphtEnvBootstrap
 			$this->error = $e->getMessage();
 			return null;
 		}
+	}
+}
+
+/*
+ * Cypht's env() reads getenv() until the build patches it. On a threaded
+ * server (Apache on Windows) the environment is shared by concurrent
+ * requests, which then see each other's values, e.g. DISABLE_OPEN_BASE_DIR.
+ * $_ENV belongs to this request. Cypht skips declaring env() when one
+ * already exists.
+ */
+if (!function_exists('env')) {
+	/**
+	 * Read a configuration value, from this request's $_ENV first.
+	 *
+	 * @param string $key
+	 * @param mixed $default
+	 * @return mixed
+	 */
+	function env($key, $default = null)
+	{
+		$value = array_key_exists($key, $_ENV) ? $_ENV[$key] : getenv($key);
+
+		return $value ?: $default;
 	}
 }
