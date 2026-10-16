@@ -404,7 +404,9 @@ if ($socid > 0) {
 			'name' => (string) $obj->nom,
 			'code_client' => (string) $obj->code_client,
 			'code_fournisseur' => (string) $obj->code_fournisseur,
-			'is_customer' => ((int) $obj->client > 0),
+			// client: 1 customer, 2 prospect, 3 both
+			'is_customer' => in_array((int) $obj->client, array(1, 3), true),
+			'is_prospect' => in_array((int) $obj->client, array(2, 3), true),
 			'is_supplier' => ((int) $obj->fournisseur > 0),
 			'town' => (string) $obj->town,
 			'phone' => (string) $obj->phone,
