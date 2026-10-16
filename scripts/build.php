@@ -315,7 +315,7 @@ function cyphtPrepare($root, array $options, $vendorLayout, $installer, $patches
 	}
 	cyphtSay("installed: ".implode(', ', $installer->listModuleSets())."\n", $options['quiet']);
 
-	if (!$patches->patchCoreFunctionsGuard() || !$patches->patchMimeMessage()) {
+	if (!$patches->patchCoreFunctionsGuard() || !$patches->patchMimeMessage() || !$patches->patchEnvironment()) {
 		fwrite(STDERR, $patches->error."\n");
 		exit(1);
 	}

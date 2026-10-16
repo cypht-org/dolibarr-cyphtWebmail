@@ -152,8 +152,8 @@ class CyphtLogin
 	}
 
 	/**
-	 * Put the preferences in the environment for the dolibarr_prefs module
-	 * set to read during cypht_login().
+	 * Put the preferences in $_ENV for the dolibarr_prefs module set to
+	 * read during cypht_login().
 	 *
 	 * @param string $userLang Dolibarr language code
 	 * @return void
@@ -169,7 +169,6 @@ class CyphtLogin
 
 		foreach ($values as $key => $value) {
 			$_ENV[$key] = $value;
-			putenv($key . '=' . $value);
 		}
 	}
 
@@ -205,8 +204,8 @@ class CyphtLogin
 
 		if (!is_array($modules) || !in_array('site', $modules, true)) {
 			$this->error = 'The webmail module list resolved without "site", so its authentication class is never loaded. '
-				. 'config/app.php reads this through env(), which is getenv() only, so a correct .env on disk does not '
-				. 'guarantee it. Resolved ' . (is_array($modules) ? count($modules) . ' modules' : gettype($modules)) . '.';
+				. 'The list comes from config/zz_dolibarr.php, written by the build; rebuilding should restore it. '
+				. 'Resolved ' . (is_array($modules) ? count($modules) . ' modules' : gettype($modules)) . '.';
 			return false;
 		}
 

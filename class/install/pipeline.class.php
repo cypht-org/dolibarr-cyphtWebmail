@@ -814,6 +814,13 @@ class CyphtPipeline
 		}
 		$emit("Patched the HTML message format in modules/smtp/hm-mime-message.php.\n");
 
+		if (!$this->upstreamPatcher->patchEnvironment()) {
+			$this->error = $this->upstreamPatcher->error;
+			$emit($this->error . "\n", 'err');
+			return array('success' => false, 'output' => $log, 'error' => $this->error);
+		}
+		$emit("Patched lib/environment.php to keep settings out of the shared process environment.\n");
+
 		$phpBinary = $this->findPhpBinary();
 		if ($phpBinary === null) {
 			$emit("No usable PHP CLI executable found. PHP is running as an Apache module here, so PHP_BINARY " .

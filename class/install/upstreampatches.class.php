@@ -77,6 +77,37 @@ class CyphtUpstreamPatches
 	}
 
 	/**
+	 * Keep Cypht's settings out of the process environment in lib/environment.php.
+	 * On a threaded server it is shared by concurrent requests and other apps.
+	 * Dotenv still fills $_ENV, which env() then reads first.
+	 *
+	 * @return bool
+	 */
+	public function patchEnvironment()
+	{
+		return $this->patchFile('/lib/environment.php', function ($content) {
+			$replacements = array(
+				'$dotenvLoader->usePutenv(true);' => '$dotenvLoader->usePutenv(false);',
+				'return getenv($key) ?: $default;' => '$value = array_key_exists($key, $_ENV) ? $_ENV[$key] : getenv($key);'
+					. "\n        return \$value ?: \$default;",
+			);
+
+			foreach ($replacements as $from => $to) {
+				if (strpos($content, $to) !== false) {
+					continue;
+				}
+				// Fail the build rather than ship half of it.
+				if (strpos($content, $from) === false) {
+					return null;
+				}
+				$content = str_replace($from, $to, $content);
+			}
+
+			return $content;
+		});
+	}
+
+	/**
 	 * Rewrite a Cypht file with $patch, if it changes anything.
 	 *
 	 * @param string $file Path inside the Cypht package

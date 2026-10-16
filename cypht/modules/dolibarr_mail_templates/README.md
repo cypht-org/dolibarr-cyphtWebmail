@@ -1,34 +1,41 @@
 # dolibarr_mail_templates
 
-Puts Dolibarr's general purpose email templates on the Cypht compose screen.
+Puts Dolibarr's email templates on the Cypht compose screen.
 
 ## What it does
 
-On every compose page load the module asks `bridge/mail_templates.php` for the
-templates this user is allowed to see, and renders them as a picker above the
-To/Subject/Message block. Choosing one fills the subject (only when it is still
-empty) and inserts the body at the caret, so a template can be dropped in above
-an existing signature without destroying it.
+The compose page gets a **Use a template** button. It opens a dialog listing
+the templates grouped by type, with a search field and a preview. **Insert**
+fills the subject when it is still empty and puts the body at the caret, so a
+template can go above an existing signature. **Undo** puts back what was
+there before.
+
+The templates come from the cache file `index.php` writes before the iframe
+loads (`CyphtMailTemplateCache`), and from `bridge/mail_templates.php` when
+the cache is missing.
 
 ## Which templates appear
 
-Only those with `type_template = 'all'`. Every other type in
-`llx_c_email_templates` is transactional: its body is written around an object
-and carries placeholders such as `__TICKET_URL__` or `__MEMBER_FULLNAME__` that
-only `make_substitutions()` with that object can fill. Compose has no object,
-so those templates would paste raw markers into the user's email. The filter
-lives in the bridge, not here.
+Every active template in `llx_c_email_templates` the user can see: entity
+scoping plus `private = 0 OR fk_user = me`, like
+`FormMail::getEMailTemplate()`.
 
-**Dolibarr core seeds no templates of type `all`.** A fresh install therefore
-shows an empty, disabled picker carrying the hint from the bridge. This is the
-expected state, not a fault. Create one under Home, Setup, Emails, Email
-templates, with type "All".
+The common substitution keys (company, user, dates) are filled with
+`getCommonSubstitutionArray()`. Keys that need an object, like
+`__TICKET_URL__` or `__MEMBER_FULLNAME__`, can't be filled from compose: they
+stay in the text, the template is flagged in the list, and the preview lists
+them under "Contains placeholders to fill in by hand".
 
-## Known limitation
+## HTML and plain text
 
-Template bodies are inserted verbatim. A template authored as HTML lands as
-HTML source in the plain text compose box. Templates intended for webmail use
-should be written as plain text until the compose screen grows an HTML mode.
+`site.js` follows the compose format (`data-compose-type` on the form):
+
+- HTML editor: HTML templates go in as HTML, plain text ones are escaped with
+  their line breaks turned into `<br>`.
+- Plain text: HTML templates are converted to text, keeping the line breaks.
+
+A body counts as HTML when it has real HTML tags, the same test as Dolibarr's
+`dol_textishtml()`.
 
 ## Configuration
 
@@ -57,6 +64,8 @@ Visibility follows `FormMail::getEMailTemplate()`: entity scoping plus
 
 | File | Role |
 | --- | --- |
-| `hm-dolibarr-mail-templates.php` | `Hm_Dolibarr_Mail_Templates`, the signed HTTP client |
-| `modules.php` | handler that loads and caches, output that renders the picker |
+| `hm-dolibarr-mail-templates.php` | `Hm_Dolibarr_Mail_Templates`, reads the cache or calls the bridge |
+| `modules.php` | handler that loads and caches, output that renders the button and dialog |
 | `setup.php` | page hooks and allowed output |
+| `site.js` | the dialog, the preview and inserting into either editor |
+| `site.css` | dialog layout |

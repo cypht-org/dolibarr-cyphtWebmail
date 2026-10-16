@@ -195,6 +195,7 @@ class Hm_Output_dolibarr_context_shell extends Hm_Output_Module {
             ' data-str-more="'.$this->html_safe($this->trans('See all')).'"'.
             ' data-str-details="'.$this->html_safe($this->trans('Details')).'"'.
             ' data-str-customer="'.$this->html_safe($this->trans('Customer')).'"'.
+            ' data-str-prospect="'.$this->html_safe($this->trans('Prospect')).'"'.
             ' data-str-supplier="'.$this->html_safe($this->trans('Supplier')).'"'.
             ' data-str-add="'.$this->html_safe($this->trans('Add sender as prospect')).'"'.
             ' data-str-add-why="'.$this->html_safe($this->trans('No third party or contact has this email address.')).'"'.
